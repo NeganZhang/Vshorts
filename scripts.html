@@ -1,0 +1,998 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VSHORT — Script Generator</title>
+  <style>
+    /* ─── RESET ─────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #06060a;
+      --accent: #00d4ff;
+      --white: #eeeef5;
+    }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--white);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── TRIANGLE ENTRANCE OVERLAY ─────────────── */
+    #tri-enter {
+      position: fixed; inset: 0;
+      z-index: 9000;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg);
+      transition: opacity .5s ease;
+    }
+    #tri-enter.done { opacity: 0; pointer-events: none; }
+
+    #tri-enter svg {
+      width: 100vmax; height: 100vmax;
+      animation: tri-shrink 1.2s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+    @keyframes tri-shrink {
+      0%   { transform: scale(6) rotate(0deg);   opacity: 1; }
+      60%  { transform: scale(1) rotate(180deg);  opacity: 1; }
+      100% { transform: scale(.15) rotate(360deg); opacity: 0; }
+    }
+
+    /* ─── AMBIENT ───────────────────────────────── */
+    #amb {
+      position: fixed; inset: 0; z-index: 0;
+      background: radial-gradient(ellipse 55% 55% at 50% 45%,
+        rgba(0,212,255,.06) 0%, transparent 100%);
+    }
+
+    /* particles */
+    #particles { position: fixed; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; }
+    .pt {
+      position: absolute; border-radius: 50%; opacity: 0;
+      animation: pt-r linear infinite;
+    }
+    @keyframes pt-r {
+      0%   { transform: translateY(105vh) scale(0); opacity: 0; }
+      8%   { opacity: .4; }
+      92%  { opacity: .08; }
+      100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+    }
+
+    /* ─── HEADER ────────────────────────────────── */
+    header {
+      position: fixed; top: 0; left: 0; right: 0;
+      padding: 22px 40px;
+      display: flex; align-items: center; justify-content: space-between;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+    }
+    .logo {
+      font-size: 18px; font-weight: 900; letter-spacing: 4px;
+      cursor: pointer;
+    }
+    .logo em { font-style: normal; color: var(--accent); }
+    .page-title {
+      font-size: 11px; letter-spacing: 5px; font-weight: 700;
+      color: rgba(255,255,255,.35);
+    }
+    .back-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 42px; height: 42px;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 50%;
+      background: rgba(255,255,255,.04);
+      cursor: pointer;
+      transition: background .3s, border-color .3s, transform .3s ease;
+      backdrop-filter: blur(8px);
+      text-decoration: none;
+    }
+    .back-btn:hover {
+      background: rgba(0,212,255,.1);
+      border-color: rgba(0,212,255,.4);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(0,212,255,.15);
+    }
+    .back-btn svg {
+      width: 18px; height: 18px;
+      filter: drop-shadow(0 0 4px var(--accent));
+      transition: filter .3s ease;
+    }
+    .back-btn:hover svg {
+      filter: drop-shadow(0 0 8px var(--accent));
+    }
+
+    /* ─── WORKSPACE ─────────────────────────────── */
+    #workspace {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity .6s ease;
+    }
+    #workspace.on { opacity: 1; }
+
+    /* ─── TYPEWRITER ASSEMBLY ───────────────────── */
+    #typewriter {
+      position: relative;
+      display: flex; flex-direction: column;
+      align-items: center;
+      gap: 0;
+    }
+
+    /* ── GLASS PAPER (INPUT) ── */
+    #paper-input {
+      position: relative;
+      width: min(600px, 88vw);
+      min-height: 220px;
+      padding: 32px 36px;
+      cursor: text;
+      z-index: 5;
+
+      /* ===== LIQUID GLASS ===== */
+      background: linear-gradient(145deg,
+        rgba(255,255,255,.09) 0%,
+        rgba(255,255,255,.03) 40%,
+        rgba(0,212,255,.04)   70%,
+        rgba(255,255,255,.07) 100%);
+      backdrop-filter: blur(40px) saturate(180%);
+      -webkit-backdrop-filter: blur(40px) saturate(180%);
+      border: 1px solid rgba(255,255,255,.13);
+      border-radius: 18px;
+      box-shadow:
+        0 8px 40px rgba(0,0,0,.35),
+        0 1.5px 0 rgba(255,255,255,.08) inset,
+        0 -1px  0 rgba(255,255,255,.04) inset;
+
+      transition: box-shadow .3s ease, border-color .3s ease;
+    }
+    #paper-input:hover {
+      border-color: rgba(0,212,255,.25);
+      box-shadow:
+        0 8px 40px rgba(0,0,0,.35),
+        0 0 30px rgba(0,212,255,.06),
+        0 1.5px 0 rgba(255,255,255,.1) inset;
+    }
+    #paper-input.focused {
+      border-color: rgba(0,212,255,.35);
+      box-shadow:
+        0 8px 40px rgba(0,0,0,.35),
+        0 0 40px rgba(0,212,255,.1),
+        0 1.5px 0 rgba(255,255,255,.12) inset;
+    }
+
+    /* glass refraction line */
+    #paper-input::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 20%; right: 20%; height: 1px;
+      background: linear-gradient(90deg,
+        transparent, rgba(255,255,255,.2), transparent);
+      border-radius: 1px;
+    }
+    /* subtle inner glow */
+    #paper-input::after {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: 18px;
+      background: radial-gradient(ellipse 80% 60% at 30% 20%,
+        rgba(255,255,255,.04) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    /* text area */
+    #typed-text {
+      font-family: 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.8;
+      color: var(--white);
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 1.8em;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* blinking cursor */
+    #cursor {
+      display: inline-block;
+      width: 2px; height: 1.2em;
+      background: var(--accent);
+      animation: blink 1s step-end infinite;
+      vertical-align: text-bottom;
+      margin-left: 1px;
+      opacity: 0;
+      box-shadow: 0 0 6px var(--accent);
+    }
+    #cursor.on { opacity: 1; }
+    @keyframes blink {
+      0%, 50% { opacity: 1; }
+      51%, 100% { opacity: 0; }
+    }
+
+    /* placeholder */
+    #placeholder {
+      position: absolute;
+      top: 32px; left: 36px;
+      font-family: 'Courier New', monospace;
+      font-size: 15px;
+      color: rgba(255,255,255,.22);
+      pointer-events: none;
+      transition: opacity .3s ease;
+      z-index: 3;
+    }
+    #placeholder.hidden { opacity: 0; }
+
+    /* clack flash */
+    .clack-flash {
+      position: absolute;
+      width: 4px; height: 4px;
+      background: var(--accent);
+      border-radius: 50%;
+      filter: blur(2px);
+      pointer-events: none;
+      animation: clack .25s ease-out forwards;
+      z-index: 10;
+    }
+    @keyframes clack {
+      0%   { transform: scale(1); opacity: .8; }
+      100% { transform: scale(3); opacity: 0;  }
+    }
+
+    /* ── TYPEWRITER BODY ── */
+    #tw-body {
+      position: relative;
+      width: min(640px, 92vw);
+      z-index: 4;
+    }
+
+    /* roller bar */
+    #tw-roller {
+      width: 100%;
+      height: 14px;
+      background: linear-gradient(180deg,
+        #1a1a2e 0%, #2a2a40 40%, #1a1a2e 100%);
+      border-radius: 0 0 4px 4px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-top: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,.4);
+      transition: transform .05s ease;
+    }
+
+    /* key tray */
+    #tw-keys {
+      margin-top: 8px;
+      display: flex;
+      justify-content: center;
+      gap: 5px;
+      flex-wrap: wrap;
+      padding: 12px 20px;
+      background: linear-gradient(180deg,
+        rgba(20,20,40,.9) 0%, rgba(10,10,20,.95) 100%);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,.5);
+    }
+
+    .tw-key {
+      width: 28px; height: 28px;
+      border-radius: 6px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+      color: rgba(255,255,255,.35);
+      transition: all .08s ease;
+      flex-shrink: 0;
+    }
+    .tw-key.hit {
+      background: rgba(0,212,255,.25);
+      border-color: rgba(0,212,255,.5);
+      color: var(--accent);
+      transform: translateY(2px);
+      box-shadow: 0 0 10px rgba(0,212,255,.3);
+    }
+    .tw-key.enter-key {
+      width: 64px;
+      font-size: 9px;
+      letter-spacing: 1px;
+    }
+
+    /* ── ENTER HINT ── */
+    #enter-hint {
+      margin-top: 18px;
+      font-size: 10px;
+      letter-spacing: 4px;
+      color: rgba(255,255,255,.2);
+      opacity: 0;
+      transition: opacity .5s ease;
+    }
+    #enter-hint.show { opacity: 1; }
+    #enter-hint span {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    /* ─── GENERATION OVERLAY ────────────────────── */
+    #gen-overlay {
+      position: fixed; inset: 0;
+      z-index: 200;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 28px;
+      background: rgba(6,6,10,.92);
+      backdrop-filter: blur(10px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .4s ease;
+    }
+    #gen-overlay.on { opacity: 1; pointer-events: all; }
+
+    /* spinning triangle loader */
+    #gen-spinner {
+      width: 80px; height: 80px;
+      animation: spin-tri 1.8s linear infinite;
+      filter: drop-shadow(0 0 12px var(--accent)) drop-shadow(0 0 30px var(--accent));
+    }
+    @keyframes spin-tri {
+      0%   { transform: rotate(0deg) scale(1); }
+      50%  { transform: rotate(180deg) scale(.85); }
+      100% { transform: rotate(360deg) scale(1); }
+    }
+
+    #gen-text {
+      font-size: 11px;
+      letter-spacing: 5px;
+      color: rgba(255,255,255,.5);
+      animation: gen-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes gen-pulse {
+      0%,100% { opacity: .5; }
+      50%      { opacity: 1; }
+    }
+
+    /* ─── RESULT VIEW ───────────────────────────── */
+    #result-view {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 150;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .5s ease;
+    }
+    #result-view.on { opacity: 1; pointer-events: all; }
+
+    /* result glass paper */
+    #result-paper {
+      position: relative;
+      width: min(620px, 90vw);
+      max-height: 65vh;
+      padding: 36px 40px 80px;
+      overflow-y: auto;
+
+      /* LIQUID GLASS */
+      background: linear-gradient(145deg,
+        rgba(255,255,255,.1) 0%,
+        rgba(255,255,255,.03) 35%,
+        rgba(0,212,255,.05)  65%,
+        rgba(255,255,255,.08) 100%);
+      backdrop-filter: blur(44px) saturate(200%);
+      -webkit-backdrop-filter: blur(44px) saturate(200%);
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 20px;
+      box-shadow:
+        0 12px 50px rgba(0,0,0,.4),
+        0 2px 0 rgba(255,255,255,.09) inset,
+        0 -1px 0 rgba(255,255,255,.04) inset;
+
+      /* unroll animation */
+      animation: unroll .8s cubic-bezier(.34,1.56,.64,1) both;
+    }
+    @keyframes unroll {
+      0%   { max-height: 0; padding-top: 0; padding-bottom: 0; opacity: 0;
+             clip-path: inset(0 0 100% 0); border-radius: 20px 20px 4px 4px; }
+      100% { max-height: 65vh; opacity: 1;
+             clip-path: inset(0 0 0 0); }
+    }
+
+    /* refraction line */
+    #result-paper::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 15%; right: 15%; height: 1px;
+      background: linear-gradient(90deg,
+        transparent, rgba(255,255,255,.22), transparent);
+    }
+    #result-paper::after {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: 20px;
+      background: radial-gradient(ellipse 70% 50% at 25% 15%,
+        rgba(255,255,255,.05) 0%, transparent 55%);
+      pointer-events: none;
+    }
+
+    /* scrollbar */
+    #result-paper::-webkit-scrollbar { width: 4px; }
+    #result-paper::-webkit-scrollbar-track { background: transparent; }
+    #result-paper::-webkit-scrollbar-thumb {
+      background: rgba(0,212,255,.25); border-radius: 4px;
+    }
+
+    #result-label {
+      font-size: 9px;
+      letter-spacing: 5px;
+      color: rgba(255,255,255,.35);
+      margin-bottom: 16px;
+    }
+
+    #result-content {
+      font-family: 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.9;
+      color: rgba(255,255,255,.8);
+      white-space: pre-wrap;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* result cursor */
+    #res-cursor {
+      display: inline-block;
+      width: 2px; height: 1em;
+      background: var(--accent);
+      box-shadow: 0 0 6px var(--accent);
+      animation: blink 1s step-end infinite;
+      vertical-align: text-bottom;
+    }
+
+    /* ── DOWNLOAD BUTTON ── */
+    #dl-wrap {
+      margin-top: 24px;
+      opacity: 0;
+      transition: opacity .5s ease;
+    }
+    #dl-wrap.show { opacity: 1; }
+
+    #dl-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 32px;
+      background: linear-gradient(135deg,
+        rgba(0,212,255,.2) 0%, rgba(0,212,255,.08) 100%);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(0,212,255,.35);
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all .3s ease;
+    }
+    #dl-btn:hover {
+      background: linear-gradient(135deg,
+        rgba(0,212,255,.3) 0%, rgba(0,212,255,.12) 100%);
+      border-color: rgba(0,212,255,.5);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0,212,255,.15);
+    }
+
+    /* triangle icon in button */
+    #dl-btn .tri-icon {
+      width: 24px; height: 24px;
+      filter: drop-shadow(0 0 6px var(--accent));
+    }
+    #dl-btn .dl-label {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--accent);
+    }
+
+    /* ── NEW SCRIPT BTN ── */
+    #new-btn {
+      margin-top: 14px;
+      padding: 10px 24px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 40px;
+      background: rgba(255,255,255,.04);
+      color: rgba(255,255,255,.5);
+      font-size: 10px; letter-spacing: 2px;
+      cursor: pointer;
+      transition: all .3s ease;
+      opacity: 0;
+      transition: opacity .5s ease .3s, background .3s ease, border-color .3s ease;
+    }
+    #new-btn.show { opacity: 1; }
+    #new-btn:hover {
+      background: rgba(255,255,255,.08);
+      border-color: rgba(255,255,255,.25);
+      color: rgba(255,255,255,.7);
+    }
+
+    /* ─── EXIT TRANSITION (back to landing) ───── */
+    #tri-exit {
+      position: fixed; inset: 0;
+      z-index: 9500;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .15s ease;
+    }
+    #tri-exit.on {
+      opacity: 1;
+      pointer-events: all;
+    }
+    #tri-exit svg {
+      width: 120px; height: 120px;
+      filter: drop-shadow(0 0 10px var(--accent)) drop-shadow(0 0 30px var(--accent));
+      opacity: 0;
+    }
+    #tri-exit.on svg {
+      animation: tri-exit-anim 1s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+    @keyframes tri-exit-anim {
+      0%   { transform: scale(.2) rotate(180deg); opacity: 0; }
+      30%  { transform: scale(1) rotate(0deg);    opacity: 1; }
+      60%  { transform: scale(1.1) rotate(-10deg); opacity: 1; }
+      100% { transform: scale(14) rotate(60deg);   opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════
+     TRIANGLE EXIT (back transition)
+════════════════════════════════════════════ -->
+<div id="tri-exit">
+  <svg viewBox="0 0 200 200">
+    <polygon points="100,175 15,35 185,35"
+      fill="none" stroke="#00d4ff" stroke-width="3" stroke-linejoin="round"/>
+    <polygon points="100,175 15,35 185,35"
+      fill="rgba(0,212,255,.12)"/>
+  </svg>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     TRIANGLE ENTRANCE
+════════════════════════════════════════════ -->
+<div id="tri-enter">
+  <svg viewBox="0 0 200 200">
+    <polygon points="100,15 190,172 10,172"
+      fill="none" stroke="#00d4ff" stroke-width="2"
+      filter="url(#glow)"/>
+    <polygon points="100,15 190,172 10,172"
+      fill="rgba(0,212,255,.12)"/>
+    <defs>
+      <filter id="glow">
+        <feGaussianBlur stdDeviation="4" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+  </svg>
+</div>
+
+<!-- ambient bg -->
+<div id="amb"></div>
+<div id="particles"></div>
+
+<!-- ═══════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════ -->
+<header>
+  <a class="logo" href="index.html#skip-intro">V<em>SHORT</em></a>
+  <span class="page-title">S C R I P T &nbsp; G E N E R A T O R</span>
+  <button class="back-btn" id="back-btn" title="Go back">
+    <svg viewBox="0 0 200 200">
+      <polygon points="100,175 15,35 185,35"
+        fill="none" stroke="#00d4ff" stroke-width="5" stroke-linejoin="round"
+        filter="url(#glow)"/>
+      <polygon points="100,175 15,35 185,35"
+        fill="rgba(0,212,255,.12)"/>
+    </svg>
+  </button>
+</header>
+
+<!-- ═══════════════════════════════════════════
+     WORKSPACE — TYPEWRITER + GLASS PAPER
+════════════════════════════════════════════ -->
+<div id="workspace">
+
+  <div id="typewriter">
+
+    <!-- glass paper input -->
+    <div id="paper-input">
+      <div id="text-row">
+        <span id="typed-text"></span><span id="cursor"></span>
+      </div>
+      <div id="placeholder">Click here & describe your video idea...</div>
+    </div>
+
+    <!-- typewriter body -->
+    <div id="tw-body">
+      <div id="tw-roller"></div>
+      <div id="tw-keys"></div>
+    </div>
+
+    <div id="enter-hint">PRESS <span>ENTER</span> TO GENERATE</div>
+
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════
+     GENERATION OVERLAY
+════════════════════════════════════════════ -->
+<div id="gen-overlay">
+  <svg id="gen-spinner" viewBox="0 0 200 200">
+    <polygon points="100,20 180,165 20,165"
+      fill="none" stroke="#00d4ff" stroke-width="3"
+      filter="url(#glow2)"/>
+    <polygon points="100,45 160,150 40,150"
+      fill="none" stroke="rgba(0,212,255,.3)" stroke-width="1"/>
+    <circle cx="100" cy="107" r="4" fill="#00d4ff" opacity=".8"/>
+    <defs>
+      <filter id="glow2">
+        <feGaussianBlur stdDeviation="3" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+  </svg>
+  <div id="gen-text">G E N E R A T I N G &nbsp; S C R I P T</div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     RESULT VIEW — UNROLLED GLASS PAPER
+════════════════════════════════════════════ -->
+<div id="result-view">
+  <div id="result-paper">
+    <div id="result-label">G E N E R A T E D &nbsp; S C R I P T</div>
+    <div id="result-content"></div>
+    <span id="res-cursor"></span>
+  </div>
+  <div id="dl-wrap">
+    <button id="dl-btn">
+      <svg class="tri-icon" viewBox="0 0 200 200">
+        <polygon points="100,20 175,160 25,160"
+          fill="none" stroke="#00d4ff" stroke-width="4"
+          filter="url(#glow3)"/>
+        <polygon points="100,20 175,160 25,160"
+          fill="rgba(0,212,255,.15)"/>
+        <defs>
+          <filter id="glow3">
+            <feGaussianBlur stdDeviation="2" result="b"/>
+            <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+      </svg>
+      <span class="dl-label">DOWNLOAD</span>
+    </button>
+  </div>
+  <button id="new-btn">WRITE ANOTHER →</button>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   ENTRANCE ANIMATION
+═══════════════════════════════════════════════ */
+const triEnter  = document.getElementById('tri-enter');
+const workspace = document.getElementById('workspace');
+
+setTimeout(() => {
+  triEnter.classList.add('done');
+}, 1300);
+
+setTimeout(() => {
+  workspace.classList.add('on');
+  spawnParticles();
+}, 1600);
+
+/* ═══════════════════════════════════════════════
+   BUILD TYPEWRITER KEYS
+═══════════════════════════════════════════════ */
+const KEY_LAYOUT = 'QWERTYUIOPASDFGHJKL⏎ZXCVBNM.,';
+const twKeys = document.getElementById('tw-keys');
+const keyEls = {};
+
+KEY_LAYOUT.split('').forEach(ch => {
+  const k = document.createElement('div');
+  k.className = 'tw-key' + (ch === '⏎' ? ' enter-key' : '');
+  k.textContent = ch === '⏎' ? 'ENTER' : ch;
+  twKeys.appendChild(k);
+  keyEls[ch] = k;
+});
+
+/* ═══════════════════════════════════════════════
+   INPUT — GLASS PAPER TYPING
+═══════════════════════════════════════════════ */
+const paperInput = document.getElementById('paper-input');
+const typedText  = document.getElementById('typed-text');
+const cursor     = document.getElementById('cursor');
+const placeholder = document.getElementById('placeholder');
+const enterHint  = document.getElementById('enter-hint');
+const roller     = document.getElementById('tw-roller');
+
+let isFocused    = false;
+let textContent  = '';
+let hasTyped     = false;
+
+/* Click to focus */
+paperInput.addEventListener('click', () => {
+  isFocused = true;
+  paperInput.classList.add('focused');
+  cursor.classList.add('on');
+});
+
+/* click outside to unfocus */
+document.addEventListener('click', e => {
+  if (!paperInput.contains(e.target) && !e.target.closest('#workspace')) {
+    isFocused = false;
+    paperInput.classList.remove('focused');
+    cursor.classList.remove('on');
+  }
+});
+
+/* Keyboard handler */
+document.addEventListener('keydown', e => {
+  if (!isFocused) return;
+
+  /* ENTER → generate */
+  if (e.key === 'Enter' && textContent.trim().length > 0) {
+    e.preventDefault();
+    hitKey('⏎');
+    startGeneration();
+    return;
+  }
+
+  /* Backspace */
+  if (e.key === 'Backspace') {
+    e.preventDefault();
+    textContent = textContent.slice(0, -1);
+    renderText();
+    shakeRoller();
+    return;
+  }
+
+  /* printable characters */
+  if (e.key.length === 1) {
+    e.preventDefault();
+    textContent += e.key;
+    renderText();
+    hitKey(e.key.toUpperCase());
+    spawnClack();
+    shakeRoller();
+
+    if (!hasTyped) {
+      hasTyped = true;
+      placeholder.classList.add('hidden');
+      enterHint.classList.add('show');
+    }
+  }
+});
+
+function renderText() {
+  typedText.textContent = textContent;
+  if (textContent.length === 0 && hasTyped) {
+    placeholder.classList.remove('hidden');
+    enterHint.classList.remove('show');
+    hasTyped = false;
+  }
+}
+
+/* Typewriter key hit animation */
+function hitKey(ch) {
+  const el = keyEls[ch];
+  if (!el) return;
+  el.classList.add('hit');
+  setTimeout(() => el.classList.remove('hit'), 120);
+}
+
+/* Clack flash at cursor */
+function spawnClack() {
+  const flash = document.createElement('div');
+  flash.className = 'clack-flash';
+  const rect = cursor.getBoundingClientRect();
+  const pRect = paperInput.getBoundingClientRect();
+  flash.style.left = (rect.left - pRect.left) + 'px';
+  flash.style.top  = (rect.top  - pRect.top)  + 'px';
+  paperInput.appendChild(flash);
+  setTimeout(() => flash.remove(), 260);
+}
+
+/* Roller shake */
+function shakeRoller() {
+  roller.style.transform = `translateX(${(Math.random() - .5) * 3}px)`;
+  setTimeout(() => { roller.style.transform = ''; }, 50);
+}
+
+/* ═══════════════════════════════════════════════
+   GENERATION FLOW
+═══════════════════════════════════════════════ */
+const genOverlay = document.getElementById('gen-overlay');
+const resultView = document.getElementById('result-view');
+const resultContent = document.getElementById('result-content');
+const resCursor  = document.getElementById('res-cursor');
+const dlWrap     = document.getElementById('dl-wrap');
+const newBtn     = document.getElementById('new-btn');
+
+function startGeneration() {
+  isFocused = false;
+  cursor.classList.remove('on');
+
+  /* slide paper up */
+  paperInput.style.transition = 'transform .5s ease, opacity .5s ease';
+  paperInput.style.transform  = 'translateY(-40px) scale(.95)';
+  paperInput.style.opacity    = '0';
+
+  setTimeout(() => {
+    workspace.classList.remove('on');
+    genOverlay.classList.add('on');
+  }, 500);
+
+  /* simulate generation */
+  setTimeout(() => {
+    genOverlay.classList.remove('on');
+
+    setTimeout(() => {
+      resultView.classList.add('on');
+      typeOutResult(buildScript(textContent));
+    }, 400);
+  }, 3000);
+}
+
+/* Build a fake but realistic script from user input */
+function buildScript(idea) {
+  const hook = idea.charAt(0).toUpperCase() + idea.slice(1);
+  return `──────────────────────────────────
+  VSHORT SCRIPT — AI GENERATED
+──────────────────────────────────
+
+TOPIC: ${hook}
+
+━━━ HOOK (0-3s) ━━━
+"Stop scrolling — this will
+change how you think about
+${idea.split(' ').slice(0,3).join(' ')}."
+
+━━━ SETUP (3-12s) ━━━
+[VISUAL: Quick montage of the
+topic — fast cuts, dynamic
+zoom transitions]
+
+NARRATOR (V/O):
+"Most people get this wrong.
+Here's what nobody tells you
+about ${idea.split(' ').slice(0,4).join(' ')}..."
+
+━━━ BODY (12-40s) ━━━
+[VISUAL: Step-by-step breakdown
+with text overlays and kinetic
+typography]
+
+NARRATOR (V/O):
+"First — forget everything you
+think you know. The real secret
+is simpler than you think."
+
+POINT 1: The unexpected angle
+POINT 2: The proof / evidence
+POINT 3: The "aha" moment
+
+━━━ CTA (40-50s) ━━━
+[VISUAL: Clean outro card with
+subscribe animation]
+
+NARRATOR (V/O):
+"Follow for more. Drop a comment
+if this changed your mind."
+
+──────────────────────────────────
+  ESTIMATED VIRALITY: 87%
+  ENGAGEMENT SCORE:   9.2/10
+──────────────────────────────────`;
+}
+
+/* Typewriter effect for result */
+function typeOutResult(text) {
+  resultContent.textContent = '';
+  let i = 0;
+  const speed = 12;
+
+  function tick() {
+    if (i < text.length) {
+      resultContent.textContent += text[i];
+      i++;
+      /* auto scroll */
+      const paper = document.getElementById('result-paper');
+      paper.scrollTop = paper.scrollHeight;
+      setTimeout(tick, text[i-1] === '\n' ? speed * 3 : speed);
+    } else {
+      /* done — show download */
+      resCursor.style.display = 'none';
+      dlWrap.classList.add('show');
+      newBtn.classList.add('show');
+    }
+  }
+  tick();
+}
+
+/* ═══════════════════════════════════════════════
+   DOWNLOAD
+═══════════════════════════════════════════════ */
+document.getElementById('dl-btn').addEventListener('click', () => {
+  const content = resultContent.textContent;
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'vshort-script.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+/* ═══════════════════════════════════════════════
+   NEW SCRIPT
+═══════════════════════════════════════════════ */
+newBtn.addEventListener('click', () => {
+  resultView.classList.remove('on');
+  dlWrap.classList.remove('show');
+  newBtn.classList.remove('show');
+
+  textContent = '';
+  hasTyped = false;
+  typedText.textContent = '';
+  placeholder.classList.remove('hidden');
+  enterHint.classList.remove('show');
+
+  paperInput.style.transform = '';
+  paperInput.style.opacity   = '';
+
+  setTimeout(() => {
+    workspace.classList.add('on');
+  }, 400);
+});
+
+/* ═══════════════════════════════════════════════
+   PARTICLES
+═══════════════════════════════════════════════ */
+function spawnParticles() {
+  const box  = document.getElementById('particles');
+  const cols = ['#00d4ff','#0088aa','#00aacc'];
+  for (let i = 0; i < 16; i++) {
+    const p  = document.createElement('div');
+    p.className = 'pt';
+    const sz = Math.random() * 3 + 1;
+    p.style.cssText = `
+      width:${sz}px; height:${sz}px;
+      left:${Math.random() * 100}%;
+      background:${cols[i % 3]};
+      animation-duration:${8 + Math.random() * 8}s;
+      animation-delay:${Math.random() * 10}s;
+      filter:blur(${Math.random() > .5 ? 1 : 0}px);
+    `;
+    box.appendChild(p);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   BACK BUTTON → history.back()
+═══════════════════════════════════════════════ */
+/* ── Animated exit → back to dial page ── */
+function exitToDial() {
+  const triExit = document.getElementById('tri-exit');
+  triExit.classList.add('on');
+  setTimeout(() => {
+    window.location.href = 'index.html#skip-intro';
+  }, 800);
+}
+
+document.getElementById('back-btn').addEventListener('click', exitToDial);
+document.querySelector('.logo').addEventListener('click', (e) => {
+  e.preventDefault();
+  exitToDial();
+});
+</script>
+</body>
+</html>
