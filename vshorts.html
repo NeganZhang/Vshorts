@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VSHORT — Video Editor</title>
+  <style>
+    /* ─── RESET & ROOT ─────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #06060a;
+      --accent: #ff5c2b;
+      --accent-dim: rgba(255,92,43,.15);
+      --accent-glow: rgba(255,92,43,.4);
+      --white: #eeeef5;
+    }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--white);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── TRIANGLE ENTRANCE ────────────────────── */
+    #tri-enter {
+      position: fixed; inset: 0; z-index: 9000;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg);
+      transition: opacity .5s ease;
+    }
+    #tri-enter.done { opacity: 0; pointer-events: none; }
+    #tri-enter svg {
+      width: 100vmax; height: 100vmax;
+      animation: tri-shrink 1.2s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+    @keyframes tri-shrink {
+      0%   { transform: scale(6) rotate(0deg); opacity: 1; }
+      60%  { transform: scale(1) rotate(180deg); opacity: 1; }
+      100% { transform: scale(.15) rotate(360deg); opacity: 0; }
+    }
+
+    /* ─── AMBIENT ───────────────────────────────── */
+    #amb {
+      position: fixed; inset: 0; z-index: 0;
+      background: radial-gradient(ellipse 55% 55% at 50% 45%,
+        rgba(255,92,43,.05) 0%, transparent 100%);
+    }
+    #particles { position: fixed; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; }
+    .pt {
+      position: absolute; border-radius: 50%; opacity: 0;
+      animation: pt-r linear infinite;
+    }
+    @keyframes pt-r {
+      0%   { transform: translateY(105vh) scale(0); opacity: 0; }
+      8%   { opacity: .4; }
+      92%  { opacity: .08; }
+      100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+    }
+
+    /* ─── HEADER ────────────────────────────────── */
+    header {
+      position: fixed; top: 0; left: 0; right: 0;
+      padding: 18px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+      background: rgba(6,6,10,.5);
+      border-bottom: 1px solid rgba(255,255,255,.04);
+    }
+    .logo { font-size: 18px; font-weight: 900; letter-spacing: 4px; cursor: pointer; }
+    .logo em { font-style: normal; color: var(--accent); }
+    .page-title {
+      font-size: 11px; letter-spacing: 5px; font-weight: 700;
+      color: rgba(255,255,255,.35);
+    }
+    .back-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 42px; height: 42px;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 50%;
+      background: rgba(255,255,255,.04);
+      cursor: pointer;
+      transition: background .3s, border-color .3s, transform .3s ease;
+      backdrop-filter: blur(8px);
+      text-decoration: none;
+    }
+    .back-btn:hover {
+      background: rgba(255,92,43,.1);
+      border-color: rgba(255,92,43,.4);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(255,92,43,.15);
+    }
+    .back-btn svg {
+      width: 18px; height: 18px;
+      filter: drop-shadow(0 0 4px var(--accent));
+    }
+
+    /* ─── MAIN LAYOUT ───────────────────────────── */
+    #workspace {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity .6s ease;
+      padding-top: 76px;
+    }
+    #workspace.on { opacity: 1; }
+
+    /* ─── TOP AREA: PREVIEW + PANEL ─────────────── */
+    #top-area {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      gap: 0;
+    }
+
+    /* ─── VIDEO PREVIEW ─────────────────────────── */
+    #preview-pane {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      padding: 20px;
+    }
+
+    #video-frame {
+      position: relative;
+      width: 100%;
+      max-width: 560px;
+      aspect-ratio: 9/16;
+      max-height: 100%;
+      background: rgba(255,255,255,.02);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* upload zone */
+    #upload-zone {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 16px;
+      border: 2px dashed rgba(255,92,43,.15);
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all .3s ease;
+      z-index: 5;
+    }
+    #upload-zone:hover {
+      border-color: rgba(255,92,43,.35);
+      background: rgba(255,92,43,.03);
+    }
+    #upload-zone.hidden { display: none; }
+
+    .upload-diamond {
+      width: 64px; height: 64px;
+      border: 2px solid rgba(255,92,43,.2);
+      border-radius: 12px;
+      transform: rotate(45deg);
+      display: flex; align-items: center; justify-content: center;
+      transition: all .3s ease;
+    }
+    #upload-zone:hover .upload-diamond {
+      border-color: rgba(255,92,43,.5);
+      box-shadow: 0 0 20px rgba(255,92,43,.15);
+    }
+    .upload-diamond-inner {
+      transform: rotate(-45deg);
+      font-size: 24px;
+      color: rgba(255,92,43,.4);
+    }
+    .upload-text {
+      font-size: 10px; letter-spacing: 3px;
+      color: rgba(255,255,255,.2);
+    }
+    .upload-sub {
+      font-size: 10px;
+      color: rgba(255,255,255,.12);
+    }
+
+    /* preview content (shown after "upload") */
+    #preview-content {
+      display: none;
+      position: absolute; inset: 0;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    #preview-content.show { display: block; }
+
+    .preview-gradient {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg,
+        #1a0800 0%, #331500 30%, #1a0800 60%, #0d0400 100%);
+    }
+
+    /* fake video elements */
+    .fake-caption {
+      position: absolute;
+      bottom: 80px; left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 20px;
+      background: rgba(0,0,0,.7);
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      color: #fff;
+      text-align: center;
+      text-shadow: 0 2px 8px rgba(0,0,0,.8);
+      white-space: nowrap;
+    }
+
+    .fake-progress-bar {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      height: 4px;
+      background: rgba(255,255,255,.1);
+    }
+    .fake-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      border-radius: 2px;
+      transition: width 3s linear;
+    }
+
+    .play-btn-overlay {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      background: rgba(255,92,43,.2);
+      border: 2px solid rgba(255,92,43,.4);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      transition: all .3s ease;
+      backdrop-filter: blur(8px);
+    }
+    .play-btn-overlay:hover {
+      background: rgba(255,92,43,.3);
+      box-shadow: 0 0 24px rgba(255,92,43,.3);
+      transform: translate(-50%, -50%) scale(1.05);
+    }
+    .play-triangle {
+      width: 0; height: 0;
+      border-left: 18px solid var(--accent);
+      border-top: 11px solid transparent;
+      border-bottom: 11px solid transparent;
+      margin-left: 4px;
+    }
+
+    /* ─── SIDE PANEL ────────────────────────────── */
+    #side-panel {
+      width: 320px;
+      flex-shrink: 0;
+      border-left: 1px solid rgba(255,255,255,.04);
+      background: rgba(6,6,10,.6);
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* panel tabs */
+    .panel-tabs {
+      display: flex;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      flex-shrink: 0;
+    }
+    .panel-tab {
+      flex: 1;
+      padding: 14px 0;
+      text-align: center;
+      font-size: 10px; font-weight: 700; letter-spacing: 2px;
+      color: rgba(255,255,255,.3);
+      cursor: pointer;
+      transition: all .3s ease;
+      border-bottom: 2px solid transparent;
+    }
+    .panel-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .panel-tab:hover:not(.active) {
+      color: rgba(255,255,255,.5);
+      background: rgba(255,255,255,.02);
+    }
+
+    /* panel content */
+    .panel-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+    .panel-content::-webkit-scrollbar { width: 3px; }
+    .panel-content::-webkit-scrollbar-thumb { background: rgba(255,92,43,.2); border-radius: 3px; }
+
+    .panel-section { display: none; }
+    .panel-section.active { display: block; }
+
+    /* ── ENHANCE TAB ── */
+    .enhance-card {
+      padding: 14px 16px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 12px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all .3s ease;
+    }
+    .enhance-card:hover {
+      border-color: rgba(255,92,43,.25);
+      background: rgba(255,92,43,.03);
+    }
+    .enhance-card.active {
+      border-color: rgba(255,92,43,.4);
+      background: rgba(255,92,43,.06);
+    }
+
+    .enhance-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .enhance-name {
+      font-size: 12px; font-weight: 700; letter-spacing: 1px;
+    }
+    .enhance-toggle {
+      width: 36px; height: 20px;
+      border-radius: 10px;
+      background: rgba(255,255,255,.08);
+      position: relative;
+      transition: background .3s ease;
+    }
+    .enhance-toggle::after {
+      content: '';
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: rgba(255,255,255,.3);
+      transition: all .3s ease;
+    }
+    .enhance-card.active .enhance-toggle {
+      background: var(--accent);
+    }
+    .enhance-card.active .enhance-toggle::after {
+      left: 19px;
+      background: #fff;
+    }
+
+    .enhance-desc {
+      font-size: 11px;
+      color: rgba(255,255,255,.3);
+      line-height: 1.5;
+    }
+
+    /* ── CAPTIONS TAB ── */
+    .caption-style-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .caption-style {
+      padding: 16px 12px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .3s ease;
+    }
+    .caption-style:hover {
+      border-color: rgba(255,92,43,.25);
+    }
+    .caption-style.active {
+      border-color: rgba(255,92,43,.4);
+      background: rgba(255,92,43,.06);
+    }
+    .caption-preview {
+      font-size: 14px; font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .caption-label {
+      font-size: 9px; letter-spacing: 2px;
+      color: rgba(255,255,255,.25);
+    }
+
+    .option-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+    }
+    .option-label {
+      font-size: 11px; color: rgba(255,255,255,.4);
+    }
+    .option-value {
+      font-size: 11px; color: var(--accent); font-weight: 600;
+    }
+
+    /* ── MUSIC TAB ── */
+    .music-track {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 10px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all .3s ease;
+    }
+    .music-track:hover {
+      border-color: rgba(255,92,43,.25);
+      background: rgba(255,92,43,.03);
+    }
+    .music-track.active {
+      border-color: rgba(255,92,43,.4);
+      background: rgba(255,92,43,.06);
+    }
+
+    .track-icon {
+      width: 36px; height: 36px;
+      border-radius: 8px;
+      background: rgba(255,92,43,.1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .track-info { flex: 1; }
+    .track-name { font-size: 12px; font-weight: 600; }
+    .track-meta { font-size: 10px; color: rgba(255,255,255,.25); margin-top: 2px; }
+    .track-dur { font-size: 10px; color: rgba(255,255,255,.2); flex-shrink: 0; }
+
+    /* ── EXPORT TAB ── */
+    .export-option {
+      padding: 16px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.06);
+      border-radius: 12px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: all .3s ease;
+    }
+    .export-option:hover {
+      border-color: rgba(255,92,43,.25);
+    }
+    .export-option.active {
+      border-color: rgba(255,92,43,.4);
+      background: rgba(255,92,43,.06);
+    }
+    .export-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .export-desc { font-size: 11px; color: rgba(255,255,255,.25); line-height: 1.4; }
+
+    .export-action {
+      width: 100%;
+      padding: 14px;
+      margin-top: 16px;
+      background: var(--accent);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 13px; font-weight: 700; letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: all .3s ease;
+    }
+    .export-action:hover {
+      box-shadow: 0 0 24px rgba(255,92,43,.4);
+      transform: translateY(-1px);
+    }
+
+    /* ─── TIMELINE BAR (bottom) ──────────────────── */
+    #timeline-bar {
+      height: 120px;
+      flex-shrink: 0;
+      border-top: 1px solid rgba(255,255,255,.05);
+      background: rgba(6,6,10,.7);
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+      padding: 0;
+    }
+
+    /* timeline toolbar */
+    .tl-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 20px;
+      border-bottom: 1px solid rgba(255,255,255,.03);
+    }
+    .tl-time {
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      color: var(--accent);
+      letter-spacing: 1px;
+    }
+    .tl-controls {
+      display: flex; gap: 6px;
+    }
+    .tl-ctrl-btn {
+      width: 30px; height: 30px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 6px;
+      background: rgba(255,255,255,.03);
+      color: rgba(255,255,255,.4);
+      font-size: 12px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .2s ease;
+    }
+    .tl-ctrl-btn:hover {
+      border-color: rgba(255,92,43,.3);
+      color: var(--accent);
+    }
+    .tl-ctrl-btn.active {
+      background: rgba(255,92,43,.1);
+      border-color: rgba(255,92,43,.3);
+      color: var(--accent);
+    }
+    .tl-zoom {
+      font-size: 10px; color: rgba(255,255,255,.2); letter-spacing: 1px;
+    }
+
+    /* timeline tracks */
+    .tl-tracks {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 6px 20px;
+      gap: 4px;
+      overflow: hidden;
+    }
+
+    .tl-track {
+      display: flex; align-items: center; gap: 8px; height: 26px;
+    }
+    .tl-track-label {
+      width: 60px;
+      font-size: 9px; letter-spacing: 2px;
+      color: rgba(255,255,255,.2);
+      flex-shrink: 0;
+    }
+    .tl-track-bar {
+      flex: 1;
+      height: 100%;
+      background: rgba(255,255,255,.02);
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .tl-clip {
+      position: absolute;
+      top: 2px; bottom: 2px;
+      border-radius: 4px;
+      display: flex; align-items: center;
+      padding: 0 8px;
+      font-size: 9px; letter-spacing: 1px;
+      color: rgba(255,255,255,.6);
+      cursor: pointer;
+      transition: filter .2s ease;
+    }
+    .tl-clip:hover { filter: brightness(1.2); }
+
+    .tl-clip.video {
+      left: 0; width: 75%;
+      background: linear-gradient(90deg, rgba(255,92,43,.25), rgba(255,92,43,.12));
+      border: 1px solid rgba(255,92,43,.2);
+    }
+    .tl-clip.caption {
+      left: 5%; width: 65%;
+      background: linear-gradient(90deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+      border: 1px solid rgba(255,255,255,.08);
+    }
+    .tl-clip.audio {
+      left: 0; width: 80%;
+      background: linear-gradient(90deg, rgba(100,200,255,.15), rgba(100,200,255,.05));
+      border: 1px solid rgba(100,200,255,.12);
+    }
+
+    /* playhead */
+    .tl-playhead {
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 2px;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      left: 35%;
+      z-index: 5;
+      pointer-events: none;
+    }
+    .tl-playhead::before {
+      content: '';
+      position: absolute;
+      top: -4px; left: -5px;
+      width: 12px; height: 8px;
+      background: var(--accent);
+      clip-path: polygon(0 0, 100% 0, 50% 100%);
+    }
+
+    /* ─── PROCESSING OVERLAY ────────────────────── */
+    #process-overlay {
+      position: fixed; inset: 0;
+      z-index: 200;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 24px;
+      background: rgba(6,6,10,.92);
+      backdrop-filter: blur(10px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .4s ease;
+    }
+    #process-overlay.on { opacity: 1; pointer-events: all; }
+
+    .process-ring {
+      width: 80px; height: 80px;
+      border: 3px solid rgba(255,92,43,.1);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .process-text {
+      font-size: 11px; letter-spacing: 5px;
+      color: rgba(255,255,255,.5);
+      animation: proc-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes proc-pulse {
+      0%,100% { opacity: .5; }
+      50% { opacity: 1; }
+    }
+
+    .process-bar-wrap {
+      width: min(300px, 60vw);
+      height: 4px;
+      background: rgba(255,255,255,.05);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .process-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      border-radius: 4px;
+      transition: width .3s ease;
+    }
+
+    /* ─── EXIT TRANSITION ──────────────────────── */
+    #tri-exit {
+      position: fixed; inset: 0; z-index: 9500;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg);
+      opacity: 0; pointer-events: none;
+      transition: opacity .15s ease;
+    }
+    #tri-exit.on { opacity: 1; pointer-events: all; }
+    #tri-exit svg {
+      width: 120px; height: 120px;
+      filter: drop-shadow(0 0 10px var(--accent)) drop-shadow(0 0 30px var(--accent));
+      opacity: 0;
+    }
+    #tri-exit.on svg {
+      animation: tri-exit-anim 1s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+    @keyframes tri-exit-anim {
+      0%   { transform: scale(.2) rotate(180deg); opacity: 0; }
+      30%  { transform: scale(1) rotate(0deg); opacity: 1; }
+      60%  { transform: scale(1.1) rotate(-10deg); opacity: 1; }
+      100% { transform: scale(14) rotate(60deg); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- diamond exit -->
+<div id="tri-exit">
+  <svg viewBox="0 0 200 200">
+    <polygon points="100,10 190,100 100,190 10,100"
+      fill="none" stroke="#ff5c2b" stroke-width="3" stroke-linejoin="round"/>
+    <polygon points="100,10 190,100 100,190 10,100"
+      fill="rgba(255,92,43,.12)"/>
+  </svg>
+</div>
+
+<!-- diamond entrance -->
+<div id="tri-enter">
+  <svg viewBox="0 0 200 200">
+    <polygon points="100,10 190,100 100,190 10,100"
+      fill="none" stroke="#ff5c2b" stroke-width="2"
+      filter="url(#glow)"/>
+    <polygon points="100,10 190,100 100,190 10,100"
+      fill="rgba(255,92,43,.12)"/>
+    <defs>
+      <filter id="glow">
+        <feGaussianBlur stdDeviation="4" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+  </svg>
+</div>
+
+<!-- ambient -->
+<div id="amb"></div>
+<div id="particles"></div>
+
+<!-- processing overlay -->
+<div id="process-overlay">
+  <div class="process-ring"></div>
+  <div class="process-text">P R O C E S S I N G</div>
+  <div class="process-bar-wrap">
+    <div class="process-bar-fill" id="process-fill"></div>
+  </div>
+</div>
+
+<!-- header -->
+<header>
+  <a class="logo" href="index.html#skip-intro">V<em>SHORT</em></a>
+  <span class="page-title">V S H O R T S &nbsp; E D I T O R</span>
+  <button class="back-btn" id="back-btn" title="Go back">
+    <svg viewBox="0 0 200 200">
+      <polygon points="100,10 190,100 100,190 10,100"
+        fill="none" stroke="#ff5c2b" stroke-width="5" stroke-linejoin="round"
+        filter="url(#glow)"/>
+      <polygon points="100,10 190,100 100,190 10,100"
+        fill="rgba(255,92,43,.12)"/>
+    </svg>
+  </button>
+</header>
+
+<!-- workspace -->
+<div id="workspace">
+
+  <!-- top: preview + panel -->
+  <div id="top-area">
+
+    <!-- video preview -->
+    <div id="preview-pane">
+      <div id="video-frame">
+        <div id="upload-zone">
+          <div class="upload-diamond">
+            <span class="upload-diamond-inner">◈</span>
+          </div>
+          <span class="upload-text">DROP CLIPS HERE</span>
+          <span class="upload-sub">or click to upload</span>
+        </div>
+
+        <div id="preview-content">
+          <div class="preview-gradient"></div>
+          <div class="fake-caption">This will change everything...</div>
+          <div class="play-btn-overlay" id="play-btn">
+            <div class="play-triangle"></div>
+          </div>
+          <div class="fake-progress-bar">
+            <div class="fake-progress-fill" id="progress-fill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- side panel -->
+    <div id="side-panel">
+      <div class="panel-tabs">
+        <div class="panel-tab active" data-tab="enhance">ENHANCE</div>
+        <div class="panel-tab" data-tab="captions">CAPTIONS</div>
+        <div class="panel-tab" data-tab="music">MUSIC</div>
+        <div class="panel-tab" data-tab="export">EXPORT</div>
+      </div>
+      <div class="panel-content">
+
+        <!-- ENHANCE SECTION -->
+        <div class="panel-section active" data-section="enhance">
+          <div class="enhance-card active" data-feature="autocut">
+            <div class="enhance-header">
+              <span class="enhance-name">AUTO-CUT</span>
+              <div class="enhance-toggle"></div>
+            </div>
+            <div class="enhance-desc">AI removes dead air, long pauses, and filler words automatically</div>
+          </div>
+          <div class="enhance-card active" data-feature="color">
+            <div class="enhance-header">
+              <span class="enhance-name">COLOR GRADE</span>
+              <div class="enhance-toggle"></div>
+            </div>
+            <div class="enhance-desc">Apply cinematic color grading tuned for social media</div>
+          </div>
+          <div class="enhance-card" data-feature="zoom">
+            <div class="enhance-header">
+              <span class="enhance-name">SMART ZOOM</span>
+              <div class="enhance-toggle"></div>
+            </div>
+            <div class="enhance-desc">Auto-zooms into speakers and key visual elements</div>
+          </div>
+          <div class="enhance-card" data-feature="stabilize">
+            <div class="enhance-header">
+              <span class="enhance-name">STABILIZE</span>
+              <div class="enhance-toggle"></div>
+            </div>
+            <div class="enhance-desc">Smooth out shaky handheld footage with AI stabilization</div>
+          </div>
+          <div class="enhance-card" data-feature="denoise">
+            <div class="enhance-header">
+              <span class="enhance-name">NOISE REDUCE</span>
+              <div class="enhance-toggle"></div>
+            </div>
+            <div class="enhance-desc">Remove background noise and enhance voice clarity</div>
+          </div>
+        </div>
+
+        <!-- CAPTIONS SECTION -->
+        <div class="panel-section" data-section="captions">
+          <div class="caption-style-grid">
+            <div class="caption-style active">
+              <div class="caption-preview" style="color:#fff;text-shadow:0 2px 4px rgba(0,0,0,.8)">Bold</div>
+              <div class="caption-label">IMPACT</div>
+            </div>
+            <div class="caption-style">
+              <div class="caption-preview" style="color:#ff5c2b;font-family:monospace">Neon</div>
+              <div class="caption-label">GLOW</div>
+            </div>
+            <div class="caption-style">
+              <div class="caption-preview" style="font-size:12px;font-weight:400;color:rgba(255,255,255,.7)">Clean</div>
+              <div class="caption-label">MINIMAL</div>
+            </div>
+            <div class="caption-style">
+              <div class="caption-preview" style="color:#ffe600;font-weight:900;letter-spacing:2px">POP</div>
+              <div class="caption-label">VIRAL</div>
+            </div>
+          </div>
+          <div class="option-row">
+            <span class="option-label">Position</span>
+            <span class="option-value">BOTTOM</span>
+          </div>
+          <div class="option-row">
+            <span class="option-label">Word Highlight</span>
+            <span class="option-value">ON</span>
+          </div>
+          <div class="option-row">
+            <span class="option-label">Font Size</span>
+            <span class="option-value">LARGE</span>
+          </div>
+          <div class="option-row">
+            <span class="option-label">Language</span>
+            <span class="option-value">AUTO-DETECT</span>
+          </div>
+        </div>
+
+        <!-- MUSIC SECTION -->
+        <div class="panel-section" data-section="music">
+          <div class="music-track active">
+            <div class="track-icon">♪</div>
+            <div class="track-info">
+              <div class="track-name">Viral Energy</div>
+              <div class="track-meta">Upbeat / Trending</div>
+            </div>
+            <span class="track-dur">0:32</span>
+          </div>
+          <div class="music-track">
+            <div class="track-icon">♪</div>
+            <div class="track-info">
+              <div class="track-name">Dark Ambient</div>
+              <div class="track-meta">Cinematic / Moody</div>
+            </div>
+            <span class="track-dur">0:45</span>
+          </div>
+          <div class="music-track">
+            <div class="track-icon">♪</div>
+            <div class="track-info">
+              <div class="track-name">Lo-Fi Chill</div>
+              <div class="track-meta">Relaxed / Educational</div>
+            </div>
+            <span class="track-dur">0:38</span>
+          </div>
+          <div class="music-track">
+            <div class="track-icon">♪</div>
+            <div class="track-info">
+              <div class="track-name">Hype Drop</div>
+              <div class="track-meta">EDM / High Energy</div>
+            </div>
+            <span class="track-dur">0:28</span>
+          </div>
+          <div class="music-track">
+            <div class="track-icon">♪</div>
+            <div class="track-info">
+              <div class="track-name">Acoustic Feel</div>
+              <div class="track-meta">Warm / Storytelling</div>
+            </div>
+            <span class="track-dur">0:50</span>
+          </div>
+          <div class="music-track">
+            <div class="track-icon">♪</div>
+            <div class="track-info">
+              <div class="track-name">No Music</div>
+              <div class="track-meta">Voice Only</div>
+            </div>
+            <span class="track-dur">—</span>
+          </div>
+        </div>
+
+        <!-- EXPORT SECTION -->
+        <div class="panel-section" data-section="export">
+          <div class="export-option active">
+            <div class="export-name">TikTok / Reels</div>
+            <div class="export-desc">9:16 vertical, optimized for mobile feeds</div>
+          </div>
+          <div class="export-option">
+            <div class="export-name">YouTube Shorts</div>
+            <div class="export-desc">9:16 vertical, YouTube-optimized encoding</div>
+          </div>
+          <div class="export-option">
+            <div class="export-name">Landscape</div>
+            <div class="export-desc">16:9 widescreen, YouTube / Twitter</div>
+          </div>
+          <div class="export-option">
+            <div class="export-name">Square</div>
+            <div class="export-desc">1:1 ratio, Instagram feed / LinkedIn</div>
+          </div>
+          <button class="export-action" id="export-btn">EXPORT VIDEO →</button>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- bottom timeline -->
+  <div id="timeline-bar">
+    <div class="tl-toolbar">
+      <span class="tl-time" id="tl-time">00:00.00 / 00:45.00</span>
+      <div class="tl-controls">
+        <button class="tl-ctrl-btn" title="Skip back">⏮</button>
+        <button class="tl-ctrl-btn active" id="tl-play" title="Play">▶</button>
+        <button class="tl-ctrl-btn" title="Skip forward">⏭</button>
+        <button class="tl-ctrl-btn" title="Split">✂</button>
+        <button class="tl-ctrl-btn" title="Undo">↩</button>
+      </div>
+      <span class="tl-zoom">100%</span>
+    </div>
+    <div class="tl-tracks">
+      <div class="tl-track">
+        <span class="tl-track-label">VIDEO</span>
+        <div class="tl-track-bar">
+          <div class="tl-clip video">clip_01.mp4</div>
+          <div class="tl-playhead" id="tl-playhead"></div>
+        </div>
+      </div>
+      <div class="tl-track">
+        <span class="tl-track-label">CAPTIONS</span>
+        <div class="tl-track-bar">
+          <div class="tl-clip caption">auto-captions</div>
+        </div>
+      </div>
+      <div class="tl-track">
+        <span class="tl-track-label">AUDIO</span>
+        <div class="tl-track-bar">
+          <div class="tl-clip audio">♪ Viral Energy</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   ENTRANCE
+═══════════════════════════════════════════════ */
+const triEnter = document.getElementById('tri-enter');
+const workspace = document.getElementById('workspace');
+
+setTimeout(() => triEnter.classList.add('done'), 1300);
+setTimeout(() => { workspace.classList.add('on'); spawnParticles(); }, 1600);
+
+/* ═══════════════════════════════════════════════
+   UPLOAD ZONE → PREVIEW
+═══════════════════════════════════════════════ */
+const uploadZone = document.getElementById('upload-zone');
+const previewContent = document.getElementById('preview-content');
+const processOverlay = document.getElementById('process-overlay');
+const processFill = document.getElementById('process-fill');
+
+uploadZone.addEventListener('click', () => {
+  // simulate file upload → processing
+  uploadZone.classList.add('hidden');
+  processOverlay.classList.add('on');
+
+  let pct = 0;
+  const iv = setInterval(() => {
+    pct += Math.random() * 15 + 5;
+    if (pct > 100) pct = 100;
+    processFill.style.width = pct + '%';
+    if (pct >= 100) {
+      clearInterval(iv);
+      setTimeout(() => {
+        processOverlay.classList.remove('on');
+        processFill.style.width = '0%';
+        previewContent.classList.add('show');
+      }, 500);
+    }
+  }, 400);
+});
+
+/* ═══════════════════════════════════════════════
+   PLAY BUTTON
+═══════════════════════════════════════════════ */
+let isPlaying = false;
+let playInterval;
+
+document.getElementById('play-btn').addEventListener('click', () => {
+  togglePlay();
+});
+
+document.getElementById('tl-play').addEventListener('click', () => {
+  if (!previewContent.classList.contains('show')) {
+    uploadZone.click();
+    return;
+  }
+  togglePlay();
+});
+
+function togglePlay() {
+  isPlaying = !isPlaying;
+  const playBtn = document.getElementById('tl-play');
+  const progressFill = document.getElementById('progress-fill');
+  const playhead = document.getElementById('tl-playhead');
+
+  if (isPlaying) {
+    playBtn.textContent = '⏸';
+    progressFill.style.transition = 'width 30s linear';
+    progressFill.style.width = '100%';
+
+    let pos = parseFloat(playhead.style.left) || 35;
+    playInterval = setInterval(() => {
+      pos += 0.2;
+      if (pos > 95) pos = 0;
+      playhead.style.left = pos + '%';
+
+      // update time display
+      const sec = (pos / 100 * 45).toFixed(2);
+      document.getElementById('tl-time').textContent =
+        `00:${String(Math.floor(sec)).padStart(2,'0')}.${(sec % 1).toFixed(2).slice(2)} / 00:45.00`;
+    }, 100);
+  } else {
+    playBtn.textContent = '▶';
+    progressFill.style.transition = 'none';
+    clearInterval(playInterval);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   SIDE PANEL TABS
+═══════════════════════════════════════════════ */
+document.querySelectorAll('.panel-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel-section').forEach(s => s.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelector(`.panel-section[data-section="${tab.dataset.tab}"]`).classList.add('active');
+  });
+});
+
+/* ═══════════════════════════════════════════════
+   ENHANCE TOGGLES
+═══════════════════════════════════════════════ */
+document.querySelectorAll('.enhance-card').forEach(card => {
+  card.addEventListener('click', () => {
+    card.classList.toggle('active');
+  });
+});
+
+/* ═══════════════════════════════════════════════
+   CAPTION STYLES
+═══════════════════════════════════════════════ */
+document.querySelectorAll('.caption-style').forEach(style => {
+  style.addEventListener('click', () => {
+    document.querySelectorAll('.caption-style').forEach(s => s.classList.remove('active'));
+    style.classList.add('active');
+  });
+});
+
+/* ═══════════════════════════════════════════════
+   MUSIC TRACKS
+═══════════════════════════════════════════════ */
+document.querySelectorAll('.music-track').forEach(track => {
+  track.addEventListener('click', () => {
+    document.querySelectorAll('.music-track').forEach(t => t.classList.remove('active'));
+    track.classList.add('active');
+    // update timeline audio clip label
+    const name = track.querySelector('.track-name').textContent;
+    const audioClip = document.querySelector('.tl-clip.audio');
+    if (audioClip) audioClip.textContent = name === 'No Music' ? '(none)' : '♪ ' + name;
+  });
+});
+
+/* ═══════════════════════════════════════════════
+   EXPORT OPTIONS
+═══════════════════════════════════════════════ */
+document.querySelectorAll('.export-option').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('.export-option').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+  });
+});
+
+document.getElementById('export-btn').addEventListener('click', () => {
+  const btn = document.getElementById('export-btn');
+  btn.textContent = 'EXPORTING...';
+  btn.style.opacity = '.6';
+  setTimeout(() => {
+    btn.textContent = 'EXPORTED ✓';
+    setTimeout(() => {
+      btn.textContent = 'EXPORT VIDEO →';
+      btn.style.opacity = '';
+    }, 1500);
+  }, 2500);
+});
+
+/* ═══════════════════════════════════════════════
+   PARTICLES
+═══════════════════════════════════════════════ */
+function spawnParticles() {
+  const box = document.getElementById('particles');
+  const cols = ['#ff5c2b', '#cc4422', '#ff8844'];
+  for (let i = 0; i < 16; i++) {
+    const p = document.createElement('div');
+    p.className = 'pt';
+    const sz = Math.random() * 3 + 1;
+    p.style.cssText = `
+      width:${sz}px; height:${sz}px;
+      left:${Math.random() * 100}%;
+      background:${cols[i % 3]};
+      animation-duration:${8 + Math.random() * 8}s;
+      animation-delay:${Math.random() * 10}s;
+      filter:blur(${Math.random() > .5 ? 1 : 0}px);
+    `;
+    box.appendChild(p);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   NAVIGATION
+═══════════════════════════════════════════════ */
+function exitToDial() {
+  document.getElementById('tri-exit').classList.add('on');
+  setTimeout(() => { window.location.href = 'index.html#skip-intro'; }, 800);
+}
+
+document.getElementById('back-btn').addEventListener('click', exitToDial);
+document.querySelector('.logo').addEventListener('click', e => {
+  e.preventDefault();
+  exitToDial();
+});
+</script>
+</body>
+</html>

@@ -455,18 +455,14 @@
 
 <!-- page transition -->
 <div id="page-transition">
-  <svg viewBox="0 0 200 200">
-    <polygon points="100,15 190,172 10,172"
-      fill="none" stroke="#00d4ff" stroke-width="3"
-      filter="url(#pt-glow)"/>
-    <polygon points="100,15 190,172 10,172"
-      fill="rgba(0,212,255,.15)"/>
+  <svg id="pt-svg" viewBox="0 0 200 200">
     <defs>
       <filter id="pt-glow">
         <feGaussianBlur stdDeviation="4" result="b"/>
         <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
     </defs>
+    <!-- shape is injected by JS -->
   </svg>
 </div>
 
@@ -883,14 +879,55 @@ function spawnParticles() {
    PAGE TRANSITION → SCRIPTS
 ═══════════════════════════════════════════════ */
 const pageTrans = document.getElementById('page-transition');
+const ptSvg     = document.getElementById('pt-svg');
 
-/* bind to "GENERATE SCRIPT" button (card 0) */
-document.querySelector('.card[data-i="0"] .card-btn').addEventListener('click', e => {
-  e.preventDefault();
-  navigateToPage('scripts.html');
+/* page map */
+const PAGE_MAP = {
+  0: 'scripts.html',
+  1: 'storyboard.html',
+  2: 'vshorts.html',
+};
+
+/* SVG shapes per service (triangle / hexagon / diamond) */
+const PT_SHAPES = [
+  /* 0 — Scripts: cyan triangle */
+  { stroke: '#00d4ff', fill: 'rgba(0,212,255,.15)',
+    d: '<polygon points="100,15 190,172 10,172" />' },
+  /* 1 — Storyboard: purple hexagon */
+  { stroke: '#b400ff', fill: 'rgba(180,0,255,.15)',
+    d: '<polygon points="100,20 175,55 175,145 100,180 25,145 25,55" />' },
+  /* 2 — VShorts: orange diamond */
+  { stroke: '#ff5c2b', fill: 'rgba(255,92,43,.15)',
+    d: '<polygon points="100,10 190,100 100,190 10,100" />' },
+];
+
+function setTransitionShape(idx) {
+  const s = PT_SHAPES[idx];
+  /* keep the <defs> filter, replace shape content */
+  const defs = ptSvg.querySelector('defs').outerHTML;
+  ptSvg.innerHTML = defs +
+    s.d.replace('/>', ` fill="none" stroke="${s.stroke}" stroke-width="3" filter="url(#pt-glow)" />`) +
+    s.d.replace('/>', ` fill="${s.fill}" />`);
+}
+
+/* bind card buttons */
+document.querySelectorAll('.card-btn').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.preventDefault();
+    const idx = +btn.closest('.card').dataset.i;
+    navigateToPage(idx);
+  });
 });
 
-function navigateToPage(url) {
+/* GET STARTED button → go to current service page */
+document.querySelector('.get-started').addEventListener('click', () => {
+  navigateToPage(cur);
+});
+
+function navigateToPage(idx) {
+  const url = PAGE_MAP[idx];
+  if (!url) return;
+  setTransitionShape(idx);
   pageTrans.classList.add('on');
   setTimeout(() => {
     window.location.href = url;

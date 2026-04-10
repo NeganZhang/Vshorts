@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VSHORT — Storyboard</title>
+  <style>
+    /* ─── RESET & ROOT ─────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #06060a;
+      --accent: #b400ff;
+      --accent-dim: rgba(180,0,255,.15);
+      --accent-glow: rgba(180,0,255,.4);
+      --white: #eeeef5;
+    }
+    html, body {
+      width: 100%; height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--white);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── TRIANGLE ENTRANCE OVERLAY ─────────────── */
+    #tri-enter {
+      position: fixed; inset: 0; z-index: 9000;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg);
+      transition: opacity .5s ease;
+    }
+    #tri-enter.done { opacity: 0; pointer-events: none; }
+    #tri-enter svg {
+      width: 100vmax; height: 100vmax;
+      animation: tri-shrink 1.2s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+    @keyframes tri-shrink {
+      0%   { transform: scale(6) rotate(0deg); opacity: 1; }
+      60%  { transform: scale(1) rotate(180deg); opacity: 1; }
+      100% { transform: scale(.15) rotate(360deg); opacity: 0; }
+    }
+
+    /* ─── AMBIENT ───────────────────────────────── */
+    #amb {
+      position: fixed; inset: 0; z-index: 0;
+      background: radial-gradient(ellipse 55% 55% at 50% 45%,
+        rgba(180,0,255,.06) 0%, transparent 100%);
+    }
+    #particles { position: fixed; inset: 0; pointer-events: none; z-index: 1; overflow: hidden; }
+    .pt {
+      position: absolute; border-radius: 50%; opacity: 0;
+      animation: pt-r linear infinite;
+    }
+    @keyframes pt-r {
+      0%   { transform: translateY(105vh) scale(0); opacity: 0; }
+      8%   { opacity: .4; }
+      92%  { opacity: .08; }
+      100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+    }
+
+    /* ─── HEADER ────────────────────────────────── */
+    header {
+      position: fixed; top: 0; left: 0; right: 0;
+      padding: 18px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      z-index: 100;
+      backdrop-filter: blur(12px);
+      background: rgba(6,6,10,.5);
+      border-bottom: 1px solid rgba(255,255,255,.04);
+    }
+    .logo { font-size: 18px; font-weight: 900; letter-spacing: 4px; cursor: pointer; }
+    .logo em { font-style: normal; color: var(--accent); }
+    .page-title {
+      font-size: 11px; letter-spacing: 5px; font-weight: 700;
+      color: rgba(255,255,255,.35);
+    }
+    .back-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 42px; height: 42px;
+      border: 1px solid rgba(255,255,255,.15);
+      border-radius: 50%;
+      background: rgba(255,255,255,.04);
+      cursor: pointer;
+      transition: background .3s, border-color .3s, transform .3s ease;
+      backdrop-filter: blur(8px);
+      text-decoration: none;
+    }
+    .back-btn:hover {
+      background: rgba(180,0,255,.1);
+      border-color: rgba(180,0,255,.4);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 14px rgba(180,0,255,.15);
+    }
+    .back-btn svg {
+      width: 18px; height: 18px;
+      filter: drop-shadow(0 0 4px var(--accent));
+    }
+
+    /* ─── MAIN WORKSPACE ────────────────────────── */
+    #workspace {
+      position: fixed; inset: 0;
+      display: flex; flex-direction: column;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity .6s ease;
+      padding-top: 80px;
+    }
+    #workspace.on { opacity: 1; }
+
+    /* ─── TOOLBAR ───────────────────────────────── */
+    #toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 32px;
+      height: 56px;
+      flex-shrink: 0;
+    }
+
+    .mode-toggle {
+      display: flex; gap: 2px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 10px;
+      padding: 3px;
+    }
+    .mode-btn {
+      padding: 8px 20px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: rgba(255,255,255,.4);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all .3s ease;
+    }
+    .mode-btn.active {
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 0 16px rgba(180,0,255,.4);
+    }
+    .mode-btn:hover:not(.active) {
+      color: rgba(255,255,255,.6);
+      background: rgba(255,255,255,.04);
+    }
+
+    .toolbar-right {
+      display: flex; gap: 12px; align-items: center;
+    }
+
+    .scene-count {
+      font-size: 10px; letter-spacing: 3px;
+      color: rgba(255,255,255,.3);
+    }
+    .scene-count span { color: var(--accent); font-weight: 700; }
+
+    .tb-btn {
+      padding: 9px 20px;
+      border: 1px solid rgba(180,0,255,.3);
+      border-radius: 10px;
+      background: rgba(180,0,255,.08);
+      color: var(--accent);
+      font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: all .3s ease;
+    }
+    .tb-btn:hover {
+      background: rgba(180,0,255,.15);
+      border-color: rgba(180,0,255,.5);
+      box-shadow: 0 0 14px rgba(180,0,255,.15);
+    }
+    .tb-btn.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    .tb-btn.primary:hover {
+      box-shadow: 0 0 20px rgba(180,0,255,.4);
+      transform: translateY(-1px);
+    }
+
+    /* ─── AUTO-MODE PROMPT BAR ──────────────────── */
+    #auto-bar {
+      display: none;
+      padding: 0 32px;
+      margin-bottom: 12px;
+    }
+    #auto-bar.show { display: flex; gap: 12px; align-items: center; }
+
+    #auto-prompt {
+      flex: 1;
+      padding: 14px 20px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 12px;
+      color: var(--white);
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      outline: none;
+      backdrop-filter: blur(20px);
+      transition: border-color .3s ease;
+    }
+    #auto-prompt:focus {
+      border-color: rgba(180,0,255,.4);
+      box-shadow: 0 0 20px rgba(180,0,255,.08);
+    }
+    #auto-prompt::placeholder { color: rgba(255,255,255,.2); }
+
+    .scene-num-input {
+      width: 70px;
+      padding: 14px 12px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 12px;
+      color: var(--white);
+      font-size: 13px;
+      text-align: center;
+      outline: none;
+      transition: border-color .3s ease;
+    }
+    .scene-num-input:focus {
+      border-color: rgba(180,0,255,.4);
+    }
+
+    #auto-generate {
+      padding: 14px 24px;
+      background: var(--accent);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 12px; font-weight: 700; letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: all .3s ease;
+      white-space: nowrap;
+    }
+    #auto-generate:hover {
+      box-shadow: 0 0 20px rgba(180,0,255,.4);
+      transform: translateY(-1px);
+    }
+
+    /* ─── TIMELINE CONTAINER ────────────────────── */
+    #timeline-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 0 0 0 0;
+    }
+
+    /* connection line */
+    #timeline {
+      flex: 1;
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 20px 32px 24px;
+      scroll-behavior: smooth;
+      position: relative;
+    }
+    #timeline::-webkit-scrollbar { height: 4px; }
+    #timeline::-webkit-scrollbar-track { background: transparent; }
+    #timeline::-webkit-scrollbar-thumb {
+      background: rgba(180,0,255,.25); border-radius: 4px;
+    }
+
+    /* ─── SCENE CARD ────────────────────────────── */
+    .scene-card {
+      flex-shrink: 0;
+      width: 300px;
+      display: flex;
+      flex-direction: column;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 16px;
+      backdrop-filter: blur(20px);
+      overflow: hidden;
+      transition: all .4s cubic-bezier(.34,1.56,.64,1);
+      position: relative;
+      animation: card-in .5s cubic-bezier(.34,1.56,.64,1) both;
+    }
+    .scene-card:hover {
+      border-color: rgba(180,0,255,.3);
+      box-shadow: 0 0 30px rgba(180,0,255,.08);
+      transform: translateY(-4px);
+    }
+    @keyframes card-in {
+      0% { opacity: 0; transform: translateY(20px) scale(.95); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* scene header */
+    .scene-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+    .scene-number {
+      font-size: 10px; font-weight: 700; letter-spacing: 3px;
+      color: var(--accent);
+    }
+    .scene-duration {
+      font-size: 10px; letter-spacing: 2px;
+      color: rgba(255,255,255,.3);
+    }
+    .scene-remove {
+      width: 24px; height: 24px;
+      border: 1px solid rgba(255,255,255,.1);
+      border-radius: 6px;
+      background: rgba(255,255,255,.03);
+      color: rgba(255,255,255,.3);
+      font-size: 14px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .2s ease;
+    }
+    .scene-remove:hover {
+      background: rgba(255,60,60,.15);
+      border-color: rgba(255,60,60,.3);
+      color: #ff5c5c;
+    }
+
+    /* image preview area */
+    .scene-preview {
+      height: 170px;
+      background: rgba(255,255,255,.02);
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      gap: 8px;
+      cursor: pointer;
+      transition: background .3s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .scene-preview:hover { background: rgba(180,0,255,.04); }
+
+    .scene-preview .placeholder-icon {
+      font-size: 32px;
+      color: rgba(255,255,255,.1);
+      transition: color .3s ease;
+    }
+    .scene-preview:hover .placeholder-icon { color: rgba(180,0,255,.3); }
+    .scene-preview .placeholder-text {
+      font-size: 9px; letter-spacing: 3px;
+      color: rgba(255,255,255,.15);
+    }
+
+    /* generated image */
+    .scene-preview .gen-image {
+      position: absolute; inset: 0;
+      background-size: cover;
+      background-position: center;
+      opacity: 0;
+      transition: opacity .5s ease;
+    }
+    .scene-preview .gen-image.show { opacity: 1; }
+    .scene-preview .gen-image::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(to bottom, transparent 60%, rgba(6,6,10,.7));
+    }
+
+    /* scene body */
+    .scene-body { padding: 14px 16px; flex: 1; display: flex; flex-direction: column; gap: 10px; }
+
+    .scene-prompt {
+      width: 100%;
+      min-height: 60px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 10px;
+      color: var(--white);
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+      transition: border-color .3s ease;
+    }
+    .scene-prompt:focus {
+      border-color: rgba(180,0,255,.35);
+      box-shadow: 0 0 14px rgba(180,0,255,.06);
+    }
+    .scene-prompt::placeholder { color: rgba(255,255,255,.15); }
+
+    /* shot controls row */
+    .shot-controls {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+    .shot-select {
+      flex: 1;
+      min-width: 80px;
+      padding: 7px 10px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 8px;
+      color: rgba(255,255,255,.5);
+      font-size: 10px;
+      outline: none;
+      cursor: pointer;
+      appearance: none;
+      -webkit-appearance: none;
+      transition: border-color .3s ease;
+    }
+    .shot-select:focus { border-color: rgba(180,0,255,.3); }
+    .shot-select option { background: #14142a; color: var(--white); }
+
+    /* ─── CONNECTOR ARROW ───────────────────────── */
+    .connector {
+      flex-shrink: 0;
+      width: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .connector::before {
+      content: '';
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, rgba(180,0,255,.15), rgba(180,0,255,.3), rgba(180,0,255,.15));
+      border-radius: 2px;
+    }
+    .connector::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      width: 8px; height: 8px;
+      border-right: 2px solid rgba(180,0,255,.4);
+      border-bottom: 2px solid rgba(180,0,255,.4);
+      transform: rotate(-45deg);
+    }
+    .connector .trans-label {
+      position: absolute;
+      bottom: calc(50% + 10px);
+      font-size: 8px;
+      letter-spacing: 2px;
+      color: rgba(180,0,255,.35);
+      white-space: nowrap;
+    }
+
+    /* ─── ADD SCENE CARD ────────────────────────── */
+    .add-scene-card {
+      flex-shrink: 0;
+      width: 200px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      border: 2px dashed rgba(180,0,255,.15);
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all .3s ease;
+    }
+    .add-scene-card:hover {
+      border-color: rgba(180,0,255,.35);
+      background: rgba(180,0,255,.04);
+    }
+    .add-icon {
+      width: 48px; height: 48px;
+      border-radius: 50%;
+      border: 2px solid rgba(180,0,255,.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 24px;
+      color: rgba(180,0,255,.4);
+      transition: all .3s ease;
+    }
+    .add-scene-card:hover .add-icon {
+      border-color: rgba(180,0,255,.5);
+      color: var(--accent);
+      box-shadow: 0 0 16px rgba(180,0,255,.2);
+    }
+    .add-label {
+      font-size: 9px; letter-spacing: 3px;
+      color: rgba(255,255,255,.2);
+    }
+
+    /* ─── BOTTOM TOOLBAR ────────────────────────── */
+    #bottom-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 32px 20px;
+      flex-shrink: 0;
+      border-top: 1px solid rgba(255,255,255,.04);
+      background: rgba(6,6,10,.5);
+      backdrop-filter: blur(12px);
+    }
+
+    .bottom-left {
+      display: flex; gap: 8px; align-items: center;
+    }
+
+    .aspect-chip {
+      padding: 6px 14px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px;
+      background: rgba(255,255,255,.03);
+      font-size: 10px; letter-spacing: 2px;
+      color: rgba(255,255,255,.35);
+      cursor: pointer;
+      transition: all .3s ease;
+    }
+    .aspect-chip.active {
+      border-color: rgba(180,0,255,.4);
+      color: var(--accent);
+      background: rgba(180,0,255,.08);
+    }
+    .aspect-chip:hover:not(.active) {
+      border-color: rgba(255,255,255,.15);
+      color: rgba(255,255,255,.5);
+    }
+
+    .quality-label {
+      font-size: 10px; letter-spacing: 2px;
+      color: rgba(255,255,255,.2);
+      margin-left: 16px;
+    }
+    .quality-label span { color: var(--accent); }
+
+    .bottom-right {
+      display: flex; gap: 10px; align-items: center;
+    }
+
+    .export-btn {
+      padding: 10px 24px;
+      background: var(--accent);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 12px; font-weight: 700; letter-spacing: 1.5px;
+      cursor: pointer;
+      transition: all .3s ease;
+    }
+    .export-btn:hover {
+      box-shadow: 0 0 20px rgba(180,0,255,.4);
+      transform: translateY(-1px);
+    }
+
+    /* ─── GENERATING OVERLAY (per scene) ────────── */
+    .scene-generating {
+      position: absolute; inset: 0;
+      background: rgba(6,6,10,.85);
+      backdrop-filter: blur(6px);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 12px;
+      border-radius: 16px;
+      z-index: 10;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .3s ease;
+    }
+    .scene-generating.on { opacity: 1; pointer-events: all; }
+
+    .scene-spinner {
+      width: 36px; height: 36px;
+      border: 2px solid rgba(180,0,255,.15);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .scene-gen-text {
+      font-size: 9px; letter-spacing: 3px;
+      color: rgba(255,255,255,.4);
+      animation: gen-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes gen-pulse {
+      0%,100% { opacity: .4; }
+      50% { opacity: 1; }
+    }
+
+    /* ─── EXIT TRANSITION ──────────────────────── */
+    #tri-exit {
+      position: fixed; inset: 0; z-index: 9500;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg);
+      opacity: 0; pointer-events: none;
+      transition: opacity .15s ease;
+    }
+    #tri-exit.on { opacity: 1; pointer-events: all; }
+    #tri-exit svg {
+      width: 120px; height: 120px;
+      filter: drop-shadow(0 0 10px var(--accent)) drop-shadow(0 0 30px var(--accent));
+      opacity: 0;
+    }
+    #tri-exit.on svg {
+      animation: tri-exit-anim 1s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+    @keyframes tri-exit-anim {
+      0%   { transform: scale(.2) rotate(180deg); opacity: 0; }
+      30%  { transform: scale(1) rotate(0deg); opacity: 1; }
+      60%  { transform: scale(1.1) rotate(-10deg); opacity: 1; }
+      100% { transform: scale(14) rotate(60deg); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- hexagon exit -->
+<div id="tri-exit">
+  <svg viewBox="0 0 200 200">
+    <polygon points="100,20 175,55 175,145 100,180 25,145 25,55"
+      fill="none" stroke="#b400ff" stroke-width="3" stroke-linejoin="round"/>
+    <polygon points="100,20 175,55 175,145 100,180 25,145 25,55"
+      fill="rgba(180,0,255,.12)"/>
+  </svg>
+</div>
+
+<!-- hexagon entrance -->
+<div id="tri-enter">
+  <svg viewBox="0 0 200 200">
+    <polygon points="100,20 175,55 175,145 100,180 25,145 25,55"
+      fill="none" stroke="#b400ff" stroke-width="2"
+      filter="url(#glow)"/>
+    <polygon points="100,20 175,55 175,145 100,180 25,145 25,55"
+      fill="rgba(180,0,255,.12)"/>
+    <defs>
+      <filter id="glow">
+        <feGaussianBlur stdDeviation="4" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+  </svg>
+</div>
+
+<!-- ambient -->
+<div id="amb"></div>
+<div id="particles"></div>
+
+<!-- header -->
+<header>
+  <a class="logo" href="index.html#skip-intro">V<em>SHORT</em></a>
+  <span class="page-title">S T O R Y B O A R D</span>
+  <button class="back-btn" id="back-btn" title="Go back">
+    <svg viewBox="0 0 200 200">
+      <polygon points="100,20 175,55 175,145 100,180 25,145 25,55"
+        fill="none" stroke="#b400ff" stroke-width="5" stroke-linejoin="round"
+        filter="url(#glow)"/>
+      <polygon points="100,20 175,55 175,145 100,180 25,145 25,55"
+        fill="rgba(180,0,255,.12)"/>
+    </svg>
+  </button>
+</header>
+
+<!-- workspace -->
+<div id="workspace">
+
+  <!-- toolbar -->
+  <div id="toolbar">
+    <div style="display:flex;gap:20px;align-items:center">
+      <div class="mode-toggle">
+        <button class="mode-btn active" data-mode="manual">MANUAL</button>
+        <button class="mode-btn" data-mode="auto">AUTO</button>
+      </div>
+      <div class="scene-count">SCENES: <span id="scene-count-num">3</span> / 8</div>
+    </div>
+    <div class="toolbar-right">
+      <button class="tb-btn" id="btn-clear">CLEAR ALL</button>
+      <button class="tb-btn primary" id="btn-generate-all">GENERATE ALL ⬡</button>
+    </div>
+  </div>
+
+  <!-- auto-mode prompt bar -->
+  <div id="auto-bar">
+    <input id="auto-prompt" type="text"
+      placeholder="Describe your full story... AI will split it into scenes automatically">
+    <input class="scene-num-input" type="number" id="auto-scene-num" value="4" min="2" max="8" title="Number of scenes">
+    <button id="auto-generate">GENERATE →</button>
+  </div>
+
+  <!-- timeline -->
+  <div id="timeline-wrap">
+    <div id="timeline"></div>
+  </div>
+
+  <!-- bottom bar -->
+  <div id="bottom-bar">
+    <div class="bottom-left">
+      <div class="aspect-chip" data-ratio="9:16">9:16</div>
+      <div class="aspect-chip active" data-ratio="16:9">16:9</div>
+      <div class="aspect-chip" data-ratio="1:1">1:1</div>
+      <span class="quality-label">QUALITY: <span>HIGH</span></span>
+    </div>
+    <div class="bottom-right">
+      <button class="tb-btn" id="btn-download">DOWNLOAD PDF</button>
+      <button class="export-btn" id="btn-export">EXPORT TO VIDEO →</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   ENTRANCE
+═══════════════════════════════════════════════ */
+const triEnter = document.getElementById('tri-enter');
+const workspace = document.getElementById('workspace');
+
+setTimeout(() => triEnter.classList.add('done'), 1300);
+setTimeout(() => { workspace.classList.add('on'); spawnParticles(); }, 1600);
+
+/* ═══════════════════════════════════════════════
+   SCENE DATA
+═══════════════════════════════════════════════ */
+const SHOT_TYPES = ['Wide Shot', 'Medium Shot', 'Close-Up', 'Extreme CU', 'Over Shoulder', 'POV', 'Establishing', 'Low Angle', 'High Angle', 'Dutch Angle'];
+const CAMERA_MOVES = ['Static', 'Pan Left', 'Pan Right', 'Tilt Up', 'Tilt Down', 'Dolly In', 'Dolly Out', 'Tracking', 'Crane', 'Handheld'];
+const TRANSITIONS = ['CUT', 'DISSOLVE', 'WIPE', 'FADE', 'ZOOM', 'WHIP PAN'];
+
+// gradient backgrounds for generated previews
+const PREVIEW_GRADIENTS = [
+  'linear-gradient(135deg, #1a0033 0%, #330066 40%, #1a0033 100%)',
+  'linear-gradient(135deg, #0d001a 0%, #4a0080 50%, #1a0033 100%)',
+  'linear-gradient(135deg, #1a0040 0%, #6600aa 40%, #2a0055 100%)',
+  'linear-gradient(135deg, #0f0020 0%, #3d0066 50%, #0f0020 100%)',
+  'linear-gradient(135deg, #200040 0%, #5500aa 40%, #1a0033 100%)',
+  'linear-gradient(135deg, #150030 0%, #4400bb 50%, #1f004a 100%)',
+  'linear-gradient(135deg, #1a0035 0%, #5c00b3 40%, #250050 100%)',
+  'linear-gradient(135deg, #100025 0%, #3a0077 50%, #100025 100%)',
+];
+
+let scenes = [
+  { prompt: '', shot: 'Wide Shot', camera: 'Static', duration: '0-3s', generated: false },
+  { prompt: '', shot: 'Medium Shot', camera: 'Dolly In', duration: '3-8s', generated: false },
+  { prompt: '', shot: 'Close-Up', camera: 'Static', duration: '8-12s', generated: false },
+];
+
+let currentMode = 'manual';
+
+/* ═══════════════════════════════════════════════
+   RENDER TIMELINE
+═══════════════════════════════════════════════ */
+function renderTimeline() {
+  const tl = document.getElementById('timeline');
+  tl.innerHTML = '';
+
+  scenes.forEach((scene, i) => {
+    // scene card
+    const card = document.createElement('div');
+    card.className = 'scene-card';
+    card.style.animationDelay = `${i * 0.08}s`;
+    card.innerHTML = `
+      <div class="scene-generating">
+        <div class="scene-spinner"></div>
+        <div class="scene-gen-text">GENERATING</div>
+      </div>
+      <div class="scene-header">
+        <span class="scene-number">SCENE ${String(i + 1).padStart(2, '0')}</span>
+        <span class="scene-duration">${scene.duration}</span>
+        <button class="scene-remove" data-i="${i}" title="Remove scene">&times;</button>
+      </div>
+      <div class="scene-preview" data-i="${i}">
+        <div class="gen-image ${scene.generated ? 'show' : ''}"
+          style="background:${PREVIEW_GRADIENTS[i % PREVIEW_GRADIENTS.length]}"></div>
+        ${!scene.generated ? `
+        <span class="placeholder-icon">⬡</span>
+        <span class="placeholder-text">CLICK TO GENERATE</span>
+        ` : `
+        <span class="placeholder-icon" style="color:rgba(180,0,255,.5);font-size:20px;position:relative;z-index:2">✓</span>
+        <span class="placeholder-text" style="color:rgba(180,0,255,.4);position:relative;z-index:2">GENERATED</span>
+        `}
+      </div>
+      <div class="scene-body">
+        <textarea class="scene-prompt" data-i="${i}"
+          placeholder="Describe this scene... framing, mood, action..."
+          rows="3">${scene.prompt}</textarea>
+        <div class="shot-controls">
+          <select class="shot-select" data-field="shot" data-i="${i}">
+            ${SHOT_TYPES.map(s => `<option ${s === scene.shot ? 'selected' : ''}>${s}</option>`).join('')}
+          </select>
+          <select class="shot-select" data-field="camera" data-i="${i}">
+            ${CAMERA_MOVES.map(c => `<option ${c === scene.camera ? 'selected' : ''}>${c}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+    `;
+    tl.appendChild(card);
+
+    // connector arrow (not after last scene)
+    if (i < scenes.length - 1) {
+      const conn = document.createElement('div');
+      conn.className = 'connector';
+      conn.innerHTML = `<span class="trans-label">${TRANSITIONS[i % TRANSITIONS.length]}</span>`;
+      tl.appendChild(conn);
+    }
+  });
+
+  // add-scene card (if < 8)
+  if (scenes.length < 8) {
+    const add = document.createElement('div');
+    if (scenes.length > 0) {
+      const conn = document.createElement('div');
+      conn.className = 'connector';
+      tl.appendChild(conn);
+    }
+    add.className = 'add-scene-card';
+    add.innerHTML = `
+      <div class="add-icon">+</div>
+      <span class="add-label">ADD SCENE</span>
+    `;
+    add.addEventListener('click', addScene);
+    tl.appendChild(add);
+  }
+
+  // update count
+  document.getElementById('scene-count-num').textContent = scenes.length;
+
+  // bind events
+  bindSceneEvents();
+}
+
+function bindSceneEvents() {
+  // remove buttons
+  document.querySelectorAll('.scene-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const i = +btn.dataset.i;
+      if (scenes.length <= 1) return;
+      scenes.splice(i, 1);
+      renderTimeline();
+    });
+  });
+
+  // prompt editing
+  document.querySelectorAll('.scene-prompt').forEach(ta => {
+    ta.addEventListener('input', () => {
+      scenes[+ta.dataset.i].prompt = ta.value;
+    });
+  });
+
+  // shot / camera selects
+  document.querySelectorAll('.shot-select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      scenes[+sel.dataset.i][sel.dataset.field] = sel.value;
+    });
+  });
+
+  // preview click → generate single scene
+  document.querySelectorAll('.scene-preview').forEach(prev => {
+    prev.addEventListener('click', () => {
+      generateScene(+prev.dataset.i);
+    });
+  });
+}
+
+function addScene() {
+  if (scenes.length >= 8) return;
+  const last = scenes[scenes.length - 1];
+  const endSec = parseInt(last.duration.split('-')[1]) || (scenes.length * 4);
+  scenes.push({
+    prompt: '',
+    shot: SHOT_TYPES[scenes.length % SHOT_TYPES.length],
+    camera: CAMERA_MOVES[scenes.length % CAMERA_MOVES.length],
+    duration: `${endSec}-${endSec + 4}s`,
+    generated: false
+  });
+  renderTimeline();
+  // scroll to end
+  const tl = document.getElementById('timeline');
+  setTimeout(() => tl.scrollLeft = tl.scrollWidth, 100);
+}
+
+/* ═══════════════════════════════════════════════
+   GENERATE SCENES
+═══════════════════════════════════════════════ */
+function generateScene(i) {
+  const card = document.querySelectorAll('.scene-card')[i];
+  if (!card) return;
+  const overlay = card.querySelector('.scene-generating');
+  overlay.classList.add('on');
+
+  setTimeout(() => {
+    scenes[i].generated = true;
+    overlay.classList.remove('on');
+    renderTimeline();
+  }, 1500 + Math.random() * 1000);
+}
+
+function generateAll() {
+  scenes.forEach((s, i) => {
+    setTimeout(() => generateScene(i), i * 600);
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   AUTO MODE
+═══════════════════════════════════════════════ */
+function autoGenerate() {
+  const prompt = document.getElementById('auto-prompt').value.trim();
+  if (!prompt) return;
+
+  const numScenes = Math.min(8, Math.max(2, +document.getElementById('auto-scene-num').value || 4));
+
+  // build scenes from prompt
+  const words = prompt.split(/\s+/);
+  const perScene = Math.ceil(words.length / numScenes);
+
+  scenes = [];
+  for (let i = 0; i < numScenes; i++) {
+    const chunk = words.slice(i * perScene, (i + 1) * perScene).join(' ');
+    const startSec = i * Math.round(45 / numScenes);
+    const endSec = (i + 1) * Math.round(45 / numScenes);
+    scenes.push({
+      prompt: chunk || `Scene ${i + 1} from: "${prompt.slice(0, 30)}..."`,
+      shot: SHOT_TYPES[i % SHOT_TYPES.length],
+      camera: CAMERA_MOVES[i % CAMERA_MOVES.length],
+      duration: `${startSec}-${endSec}s`,
+      generated: false,
+    });
+  }
+
+  renderTimeline();
+
+  // auto-generate all
+  setTimeout(generateAll, 400);
+}
+
+/* ═══════════════════════════════════════════════
+   MODE TOGGLE
+═══════════════════════════════════════════════ */
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentMode = btn.dataset.mode;
+
+    const autoBar = document.getElementById('auto-bar');
+    if (currentMode === 'auto') {
+      autoBar.classList.add('show');
+    } else {
+      autoBar.classList.remove('show');
+    }
+  });
+});
+
+/* ═══════════════════════════════════════════════
+   TOOLBAR BUTTONS
+═══════════════════════════════════════════════ */
+document.getElementById('btn-generate-all').addEventListener('click', generateAll);
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+  scenes = [
+    { prompt: '', shot: 'Wide Shot', camera: 'Static', duration: '0-4s', generated: false },
+  ];
+  renderTimeline();
+});
+
+document.getElementById('auto-generate').addEventListener('click', autoGenerate);
+
+// aspect ratio chips
+document.querySelectorAll('.aspect-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('.aspect-chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+  });
+});
+
+// export btn (visual feedback)
+document.getElementById('btn-export').addEventListener('click', () => {
+  const btn = document.getElementById('btn-export');
+  btn.textContent = 'EXPORTING...';
+  btn.style.opacity = '.6';
+  setTimeout(() => {
+    btn.textContent = 'EXPORTED ✓';
+    setTimeout(() => {
+      btn.textContent = 'EXPORT TO VIDEO →';
+      btn.style.opacity = '';
+    }, 1500);
+  }, 2000);
+});
+
+// download (text-based storyboard)
+document.getElementById('btn-download').addEventListener('click', () => {
+  let content = '═══════════════════════════════\n  VSHORT STORYBOARD\n═══════════════════════════════\n\n';
+  scenes.forEach((s, i) => {
+    content += `SCENE ${String(i+1).padStart(2,'0')}  |  ${s.duration}  |  ${s.shot}  |  ${s.camera}\n`;
+    content += `─────────────────────────────\n`;
+    content += `${s.prompt || '(no description)'}\n\n`;
+  });
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'vshort-storyboard.txt';
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+/* ═══════════════════════════════════════════════
+   PARTICLES
+═══════════════════════════════════════════════ */
+function spawnParticles() {
+  const box = document.getElementById('particles');
+  const cols = ['#b400ff', '#8800cc', '#dd44ff'];
+  for (let i = 0; i < 16; i++) {
+    const p = document.createElement('div');
+    p.className = 'pt';
+    const sz = Math.random() * 3 + 1;
+    p.style.cssText = `
+      width:${sz}px; height:${sz}px;
+      left:${Math.random() * 100}%;
+      background:${cols[i % 3]};
+      animation-duration:${8 + Math.random() * 8}s;
+      animation-delay:${Math.random() * 10}s;
+      filter:blur(${Math.random() > .5 ? 1 : 0}px);
+    `;
+    box.appendChild(p);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   NAVIGATION
+═══════════════════════════════════════════════ */
+function exitToDial() {
+  document.getElementById('tri-exit').classList.add('on');
+  setTimeout(() => { window.location.href = 'index.html#skip-intro'; }, 800);
+}
+
+document.getElementById('back-btn').addEventListener('click', exitToDial);
+document.querySelector('.logo').addEventListener('click', e => {
+  e.preventDefault();
+  exitToDial();
+});
+
+/* ═══════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════ */
+renderTimeline();
+</script>
+</body>
+</html>
