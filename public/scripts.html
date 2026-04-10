@@ -673,7 +673,13 @@
   <button id="new-btn">WRITE ANOTHER →</button>
 </div>
 
+<script src="/js/api.js"></script>
 <script>
+/* ═══════════════════════════════════════════════
+   INIT API
+═══════════════════════════════════════════════ */
+API.init();
+
 /* ═══════════════════════════════════════════════
    ENTRANCE ANIMATION
 ═══════════════════════════════════════════════ */
@@ -817,7 +823,7 @@ const resCursor  = document.getElementById('res-cursor');
 const dlWrap     = document.getElementById('dl-wrap');
 const newBtn     = document.getElementById('new-btn');
 
-function startGeneration() {
+async function startGeneration() {
   isFocused = false;
   cursor.classList.remove('on');
 
@@ -831,67 +837,35 @@ function startGeneration() {
     genOverlay.classList.add('on');
   }, 500);
 
-  /* simulate generation */
-  setTimeout(() => {
+  try {
+    /* Call backend API */
+    const { id: scriptId } = await API.generateScript(textContent);
+
+    /* Poll until done */
+    const script = await API.poll(async () => {
+      const s = await API.getScript(scriptId);
+      if (s.status === 'done' || s.status === 'error') s._done = true;
+      return s;
+    }, 500);
+
     genOverlay.classList.remove('on');
 
     setTimeout(() => {
       resultView.classList.add('on');
-      typeOutResult(buildScript(textContent));
+      typeOutResult(script.content || 'Error generating script.');
     }, 400);
-  }, 3000);
+  } catch (err) {
+    console.error('Generation error:', err);
+    genOverlay.classList.remove('on');
+    alert('Script generation failed. Please try again.');
+    resetToInput();
+  }
 }
 
-/* Build a fake but realistic script from user input */
-function buildScript(idea) {
-  const hook = idea.charAt(0).toUpperCase() + idea.slice(1);
-  return `──────────────────────────────────
-  VSHORT SCRIPT — AI GENERATED
-──────────────────────────────────
-
-TOPIC: ${hook}
-
-━━━ HOOK (0-3s) ━━━
-"Stop scrolling — this will
-change how you think about
-${idea.split(' ').slice(0,3).join(' ')}."
-
-━━━ SETUP (3-12s) ━━━
-[VISUAL: Quick montage of the
-topic — fast cuts, dynamic
-zoom transitions]
-
-NARRATOR (V/O):
-"Most people get this wrong.
-Here's what nobody tells you
-about ${idea.split(' ').slice(0,4).join(' ')}..."
-
-━━━ BODY (12-40s) ━━━
-[VISUAL: Step-by-step breakdown
-with text overlays and kinetic
-typography]
-
-NARRATOR (V/O):
-"First — forget everything you
-think you know. The real secret
-is simpler than you think."
-
-POINT 1: The unexpected angle
-POINT 2: The proof / evidence
-POINT 3: The "aha" moment
-
-━━━ CTA (40-50s) ━━━
-[VISUAL: Clean outro card with
-subscribe animation]
-
-NARRATOR (V/O):
-"Follow for more. Drop a comment
-if this changed your mind."
-
-──────────────────────────────────
-  ESTIMATED VIRALITY: 87%
-  ENGAGEMENT SCORE:   9.2/10
-──────────────────────────────────`;
+function resetToInput() {
+  paperInput.style.transform = '';
+  paperInput.style.opacity   = '';
+  setTimeout(() => workspace.classList.add('on'), 200);
 }
 
 /* Typewriter effect for result */

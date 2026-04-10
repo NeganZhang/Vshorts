@@ -697,7 +697,31 @@
 
 </div>
 
+<script src="/js/api.js"></script>
 <script>
+/* ═══════════════════════════════════════════════
+   INIT API + LOAD SCENES
+═══════════════════════════════════════════════ */
+API.init().then(() => loadScenesFromAPI());
+
+async function loadScenesFromAPI() {
+  try {
+    const apiScenes = await API.getScenes();
+    if (apiScenes.length > 0) {
+      scenes = apiScenes.map(s => ({
+        _id: s.id,
+        prompt: s.prompt,
+        shot: s.shot_type,
+        camera: s.camera_move,
+        duration: s.duration,
+        generated: s.status === 'done',
+        image_path: s.image_path,
+      }));
+      renderTimeline();
+    }
+  } catch (e) { /* use default scenes */ }
+}
+
 /* ═══════════════════════════════════════════════
    ENTRANCE
 ═══════════════════════════════════════════════ */

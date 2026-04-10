@@ -745,6 +745,8 @@
     <!-- video preview -->
     <div id="preview-pane">
       <div id="video-frame">
+        <input type="file" id="file-input" accept="video/*" multiple
+          style="display:none">
         <div id="upload-zone">
           <div class="upload-diamond">
             <span class="upload-diamond-inner">◈</span>
@@ -969,7 +971,13 @@
 
 </div>
 
+<script src="/js/api.js"></script>
 <script>
+/* ═══════════════════════════════════════════════
+   INIT API
+═══════════════════════════════════════════════ */
+API.init();
+
 /* ═══════════════════════════════════════════════
    ENTRANCE
 ═══════════════════════════════════════════════ */
@@ -980,32 +988,49 @@ setTimeout(() => triEnter.classList.add('done'), 1300);
 setTimeout(() => { workspace.classList.add('on'); spawnParticles(); }, 1600);
 
 /* ═══════════════════════════════════════════════
-   UPLOAD ZONE → PREVIEW
+   UPLOAD ZONE → REAL FILE UPLOAD
 ═══════════════════════════════════════════════ */
 const uploadZone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
 const previewContent = document.getElementById('preview-content');
 const processOverlay = document.getElementById('process-overlay');
 const processFill = document.getElementById('process-fill');
 
-uploadZone.addEventListener('click', () => {
-  // simulate file upload → processing
+// Click upload zone → open file picker
+uploadZone.addEventListener('click', () => fileInput.click());
+
+// When files selected → upload via API
+fileInput.addEventListener('change', async () => {
+  const files = fileInput.files;
+  if (!files.length) return;
+
   uploadZone.classList.add('hidden');
   processOverlay.classList.add('on');
+  processFill.style.width = '0%';
 
-  let pct = 0;
-  const iv = setInterval(() => {
-    pct += Math.random() * 15 + 5;
-    if (pct > 100) pct = 100;
-    processFill.style.width = pct + '%';
-    if (pct >= 100) {
-      clearInterval(iv);
-      setTimeout(() => {
-        processOverlay.classList.remove('on');
-        processFill.style.width = '0%';
-        previewContent.classList.add('show');
-      }, 500);
-    }
-  }, 400);
+  try {
+    await API.uploadClips(Array.from(files), (pct) => {
+      processFill.style.width = pct + '%';
+    });
+
+    processFill.style.width = '100%';
+    setTimeout(() => {
+      processOverlay.classList.remove('on');
+      processFill.style.width = '0%';
+      previewContent.classList.add('show');
+
+      // Update timeline with uploaded clip names
+      const videoClip = document.querySelector('.tl-clip.video');
+      if (videoClip) videoClip.textContent = files[0].name;
+    }, 500);
+  } catch (err) {
+    console.error('Upload error:', err);
+    processOverlay.classList.remove('on');
+    uploadZone.classList.remove('hidden');
+    alert('Upload failed. Please try again.');
+  }
+
+  fileInput.value = '';
 });
 
 /* ═══════════════════════════════════════════════
