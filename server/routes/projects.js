@@ -17,6 +17,13 @@ router.post('/', (req, res) => {
   const name = (req.body.name || 'Untitled Project').slice(0, 100);
   const id = uuid().slice(0, 16).replace(/-/g, '');
 
+  // Auth lives in Supabase now, but the local SQLite `projects` table still
+  // has a FK to the legacy local `users` table. Ensure a stub row exists
+  // for the authenticated Supabase user before inserting the project.
+  db.prepare(
+    "INSERT OR IGNORE INTO users (id, email, password) VALUES (?, ?, '__supabase__')"
+  ).run(req.user.id, req.user.email || `${req.user.id}@supabase.local`);
+
   db.prepare('INSERT INTO projects (id, user_id, name) VALUES (?, ?, ?)')
     .run(id, req.user.id, name);
 

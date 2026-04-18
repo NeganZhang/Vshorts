@@ -3,6 +3,7 @@ const { v4: uuid } = require('uuid');
 const db = require('../db');
 const { projectOwner } = require('../middleware/ownership');
 const { generateSceneImage } = require('../services/imageGen');
+const { splitScriptIntoScenes } = require('../services/claude');
 
 const router = Router();
 
@@ -132,50 +133,75 @@ router.post('/:projectId/scenes/generate-all', (req, res) => {
 });
 
 // ─── Auto-generate scenes from prompt ──────────
-router.post('/:projectId/scenes/auto-generate', (req, res) => {
-  const { projectId } = req.params;
-  const prompt = (req.body.prompt || '').trim();
-  if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
-  if (prompt.length > 2000) return res.status(400).json({ error: 'Prompt too long' });
+router.post('/:projectId/scenes/auto-generate', async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const prompt = (req.body.prompt || '').trim();
+    if (!prompt) return res.status(400).json({ error: 'Prompt is required' });
+    if (prompt.length > 2000) return res.status(400).json({ error: 'Prompt too long' });
 
-  const numScenes = Math.min(MAX_SCENES, Math.max(2, parseInt(req.body.numScenes) || 4));
+    const numScenes = Math.min(MAX_SCENES, Math.max(2, parseInt(req.body.numScenes) || 4));
 
-  // Clear existing scenes
-  db.prepare('DELETE FROM scenes WHERE project_id = ?').run(projectId);
+    // ─── Build scene plan ─────────────────────────
+    // Prefer Kimi's semantic split; fall back to the original
+    // whitespace word-chunk if Kimi is unavailable or its output
+    // can't be validated.
+    let scenesData = null;
+    try {
+      const split = await splitScriptIntoScenes(prompt, numScenes);
+      if (Array.isArray(split) && split.length === numScenes) {
+        scenesData = split;
+      }
+    } catch (e) {
+      console.warn('[auto-generate] splitter threw:', e.message);
+    }
 
-  // Mock: split prompt into scenes (Phase 2: Claude does this)
-  const words = prompt.split(/\s+/);
-  const perScene = Math.ceil(words.length / numScenes);
+    if (!scenesData) {
+      // Fallback: naive whitespace word-chunk (original logic)
+      const words = prompt.split(/\s+/);
+      const perScene = Math.ceil(words.length / numScenes);
+      scenesData = [];
+      for (let i = 0; i < numScenes; i++) {
+        const chunk = words.slice(i * perScene, (i + 1) * perScene).join(' ');
+        const startSec = i * Math.round(45 / numScenes);
+        const endSec = (i + 1) * Math.round(45 / numScenes);
+        scenesData.push({
+          prompt: chunk || `Scene ${i + 1}`,
+          shot_type:   SHOT_TYPES[i % SHOT_TYPES.length],
+          camera_move: CAMERA_MOVES[i % CAMERA_MOVES.length],
+          duration:    `${startSec}-${endSec}s`,
+        });
+      }
+    }
 
-  const createdIds = [];
-  for (let i = 0; i < numScenes; i++) {
-    const chunk = words.slice(i * perScene, (i + 1) * perScene).join(' ');
-    const startSec = i * Math.round(45 / numScenes);
-    const endSec = (i + 1) * Math.round(45 / numScenes);
-    const id = uuid().slice(0, 16).replace(/-/g, '');
+    // ─── Clear existing + insert new scenes ───────
+    db.prepare('DELETE FROM scenes WHERE project_id = ?').run(projectId);
 
-    db.prepare(`INSERT INTO scenes (id, project_id, sort_order, prompt, shot_type, camera_move, duration)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`)
-      .run(id, projectId, i,
-        chunk || `Scene ${i + 1}`,
-        SHOT_TYPES[i % SHOT_TYPES.length],
-        CAMERA_MOVES[i % CAMERA_MOVES.length],
-        `${startSec}-${endSec}s`);
+    const createdIds = [];
+    for (let i = 0; i < scenesData.length; i++) {
+      const s = scenesData[i];
+      const id = uuid().slice(0, 16).replace(/-/g, '');
+      db.prepare(`INSERT INTO scenes (id, project_id, sort_order, prompt, shot_type, camera_move, duration)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`)
+        .run(id, projectId, i, s.prompt, s.shot_type, s.camera_move, s.duration);
+      createdIds.push(id);
+    }
 
-    createdIds.push(id);
+    // Trigger image generation (staggered, same as before)
+    createdIds.forEach((id, i) => {
+      const scene = db.prepare('SELECT * FROM scenes WHERE id = ?').get(id);
+      db.prepare('UPDATE scenes SET status = ? WHERE id = ?').run('generating', id);
+      setTimeout(() => generateSceneImage(id, scene), i * 500);
+    });
+
+    const scenes = db.prepare(
+      'SELECT * FROM scenes WHERE project_id = ? ORDER BY sort_order'
+    ).all(projectId);
+    res.status(201).json(scenes);
+  } catch (err) {
+    console.error('[auto-generate] unexpected error:', err);
+    res.status(500).json({ error: 'Auto-generate failed' });
   }
-
-  // Trigger image generation
-  createdIds.forEach((id, i) => {
-    const scene = db.prepare('SELECT * FROM scenes WHERE id = ?').get(id);
-    db.prepare('UPDATE scenes SET status = ? WHERE id = ?').run('generating', id);
-    setTimeout(() => generateSceneImage(id, scene), i * 500);
-  });
-
-  const scenes = db.prepare(
-    'SELECT * FROM scenes WHERE project_id = ? ORDER BY sort_order'
-  ).all(projectId);
-  res.status(201).json(scenes);
 });
 
 module.exports = router;

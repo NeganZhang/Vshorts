@@ -704,6 +704,165 @@
       color: #ff2244;
     }
 
+    /* ─── AUTH CONFIRM EMAIL STATE ──────────────────── */
+    .auth-confirm-msg {
+      text-align: center;
+      padding: 20px 0;
+      position: relative; z-index: 2;
+    }
+    .auth-confirm-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      animation: crystal-pulse 2.5s ease-in-out infinite;
+      filter: drop-shadow(0 0 12px rgba(255,34,68,.4));
+    }
+    .auth-confirm-text {
+      font-size: 14px;
+      color: rgba(255,255,255,.6);
+      line-height: 1.7;
+      margin-bottom: 8px;
+    }
+    .auth-confirm-email {
+      font-size: 13px;
+      color: #ff2244;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .auth-confirm-hint {
+      font-size: 11px;
+      color: rgba(255,255,255,.25);
+      margin-top: 16px;
+    }
+
+    /* ─── Extra signup / profile form controls ─────── */
+    .auth-row-2 { display: flex; gap: 10px; }
+    .auth-row-2 .auth-input-group { flex: 1; margin-bottom: 14px; }
+
+    /* native date / select controls keep the glassy look */
+    select.auth-input {
+      -webkit-appearance: none; appearance: none;
+      background-image:
+        linear-gradient(45deg, transparent 50%, rgba(255,255,255,.4) 50%),
+        linear-gradient(135deg, rgba(255,255,255,.4) 50%, transparent 50%);
+      background-position:
+        calc(100% - 18px) 50%,
+        calc(100% - 13px) 50%;
+      background-size: 5px 5px, 5px 5px;
+      background-repeat: no-repeat;
+      padding-right: 32px;
+    }
+    select.auth-input option { background: #18181c; color: #fff; }
+    input[type="date"].auth-input::-webkit-calendar-picker-indicator {
+      filter: invert(.7);
+      cursor: pointer;
+    }
+
+    .auth-disclaimer {
+      position: relative; z-index: 2;
+      margin: 4px 0 14px;
+      padding: 12px 14px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 12px;
+      background: rgba(255,255,255,.02);
+      font-size: 11px;
+      color: rgba(255,255,255,.55);
+      line-height: 1.55;
+    }
+    .auth-disclaimer summary {
+      cursor: pointer;
+      color: rgba(255,34,68,.9);
+      font-weight: 600;
+      letter-spacing: .5px;
+      list-style: none;
+      outline: none;
+    }
+    .auth-disclaimer summary::-webkit-details-marker { display: none; }
+    .auth-disclaimer summary::after {
+      content: ' ▸';
+      font-size: 9px;
+      transition: transform .2s ease;
+    }
+    .auth-disclaimer[open] summary::after { content: ' ▾'; }
+    .auth-disclaimer p { margin: 8px 0 0; }
+
+    .auth-check-row {
+      display: flex; align-items: flex-start; gap: 10px;
+      margin: 6px 0 16px;
+      position: relative; z-index: 2;
+      cursor: pointer;
+      user-select: none;
+    }
+    .auth-check-row input[type="checkbox"] {
+      appearance: none; -webkit-appearance: none;
+      width: 18px; height: 18px; flex-shrink: 0;
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 5px;
+      background: rgba(255,255,255,.04);
+      cursor: pointer;
+      position: relative;
+      margin-top: 1px;
+      transition: all .2s ease;
+    }
+    .auth-check-row input[type="checkbox"]:checked {
+      background: linear-gradient(135deg, #ff2244, #cc1133);
+      border-color: #ff2244;
+      box-shadow: 0 0 10px rgba(255,34,68,.3);
+    }
+    .auth-check-row input[type="checkbox"]:checked::after {
+      content: '✓';
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-size: 12px; font-weight: 800;
+    }
+    .auth-check-row .auth-check-text {
+      font-size: 11px;
+      color: rgba(255,255,255,.65);
+      line-height: 1.5;
+    }
+
+    /* ─── PROFILE MODAL (re-uses auth-card styles) ── */
+    #profile-modal {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.72);
+      backdrop-filter: blur(18px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 200;
+      opacity: 0; pointer-events: none;
+      transition: opacity .4s ease;
+    }
+    #profile-modal.on { opacity: 1; pointer-events: all; }
+    #profile-modal .auth-card {
+      transform: scale(.96) translateY(8px);
+      transition: transform .45s cubic-bezier(.2,.9,.3,1);
+    }
+    #profile-modal.on .auth-card { transform: scale(1) translateY(0); }
+
+    .profile-email-chip {
+      position: relative; z-index: 2;
+      text-align: center;
+      margin: -6px 0 22px;
+      font-size: 12px;
+      color: rgba(255,255,255,.45);
+      letter-spacing: .3px;
+      word-break: break-all;
+    }
+    .profile-success {
+      text-align: center;
+      font-size: 11px;
+      color: #3dd17e;
+      min-height: 16px;
+      margin-bottom: 10px;
+      position: relative; z-index: 2;
+    }
+    .user-avatar {
+      cursor: pointer;
+      transition: transform .18s ease, box-shadow .18s ease;
+    }
+    .user-avatar:hover {
+      transform: scale(1.06);
+      box-shadow: 0 0 18px rgba(255,34,68,.55);
+    }
+
     /* ─── SIDE COUNTER ──────────────────────────────── */
     #side-counter {
       position: fixed; right: 36px; top: 50%;
@@ -1197,6 +1356,62 @@
           <input class="auth-input" type="password" id="auth-confirm"
             placeholder="Repeat password" autocomplete="new-password">
         </div>
+
+        <!-- Signup-only fields -->
+        <div class="auth-input-group signup-only" id="nickname-group">
+          <label class="auth-label">NICKNAME</label>
+          <input class="auth-input" type="text" id="auth-nickname"
+            placeholder="How should we call you?" maxlength="40" autocomplete="nickname">
+        </div>
+        <div class="auth-row-2 signup-only" id="birth-sex-row">
+          <div class="auth-input-group">
+            <label class="auth-label">BIRTHDAY</label>
+            <input class="auth-input" type="date" id="auth-birthday"
+              autocomplete="bday" max="2099-12-31">
+          </div>
+          <div class="auth-input-group">
+            <label class="auth-label">SEX</label>
+            <select class="auth-input" id="auth-sex" autocomplete="sex">
+              <option value="">—</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+              <option value="prefer_not_to_say">Prefer not to say</option>
+            </select>
+          </div>
+        </div>
+
+        <details class="auth-disclaimer signup-only" id="auth-disclaimer-box">
+          <summary>DISCLAIMER — please read before signing up</summary>
+          <p>
+            VSHORT is an <strong>AI-assisted creative tool</strong>. All scripts,
+            storyboards, images and edited videos are generated or produced with
+            the help of machine-learning models and are provided on an
+            &ldquo;as&nbsp;is&rdquo; basis.
+          </p>
+          <p>
+            Real-world results (audience reach, monetization, virality, artistic
+            quality) depend entirely on your content, execution and platform
+            decisions &mdash; <strong>outcomes are not guaranteed</strong> and we
+            make no warranty of fitness for any particular purpose.
+          </p>
+          <p>
+            You are solely responsible for the content you create, its legality,
+            any third-party rights it involves, and how you use it. VSHORT and
+            its operators are not liable for any direct, indirect, incidental or
+            consequential losses arising from its use.
+          </p>
+        </details>
+
+        <label class="auth-check-row signup-only" id="auth-agree-row">
+          <input type="checkbox" id="auth-agree">
+          <span class="auth-check-text">
+            I have read and accept the disclaimer above &mdash; I understand
+            VSHORT is an AI assistant, results depend on my own work, and I
+            won&rsquo;t hold the service liable for outcomes.
+          </span>
+        </label>
+
         <div class="auth-error" id="auth-error"></div>
         <button type="button" class="auth-submit" id="auth-submit">SIGN UP</button>
       </div>
@@ -1207,8 +1422,67 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════
+       PROFILE MODAL
+  ════════════════════════════════════════════ -->
+  <div id="profile-modal">
+    <div class="auth-card">
+      <button class="auth-close" id="profile-close">&times;</button>
+
+      <div class="auth-crystal">
+        <svg viewBox="0 0 200 200">
+          <defs>
+            <filter id="profile-glow">
+              <feGaussianBlur stdDeviation="3" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <polygon points="100,10 190,100 100,190 10,100"
+            fill="none" stroke="#ff2244" stroke-width="2.5"
+            filter="url(#profile-glow)"/>
+          <polygon points="100,10 190,100 100,190 10,100"
+            fill="rgba(255,34,68,.1)"/>
+          <polygon points="100,40 160,100 100,160 40,100"
+            fill="none" stroke="rgba(255,34,68,.3)" stroke-width="1"/>
+          <circle cx="100" cy="100" r="4" fill="#ff2244" opacity=".7"/>
+        </svg>
+      </div>
+
+      <div class="auth-title">YOUR PROFILE</div>
+      <div class="auth-subtitle">UPDATE YOUR DETAILS</div>
+      <div class="profile-email-chip" id="profile-email">—</div>
+
+      <div class="auth-input-group">
+        <label class="auth-label">NICKNAME</label>
+        <input class="auth-input" type="text" id="profile-nickname"
+          placeholder="How should we call you?" maxlength="40">
+      </div>
+      <div class="auth-row-2">
+        <div class="auth-input-group">
+          <label class="auth-label">BIRTHDAY</label>
+          <input class="auth-input" type="date" id="profile-birthday" max="2099-12-31">
+        </div>
+        <div class="auth-input-group">
+          <label class="auth-label">SEX</label>
+          <select class="auth-input" id="profile-sex">
+            <option value="">—</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+            <option value="other">Other</option>
+            <option value="prefer_not_to_say">Prefer not to say</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="auth-error" id="profile-error"></div>
+      <div class="profile-success" id="profile-success"></div>
+      <button type="button" class="auth-submit" id="profile-save">SAVE CHANGES</button>
+    </div>
+  </div>
+
 </div><!-- #app -->
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/api.js"></script>
 <script>
 /* ═══════════════════════════════════════════════
@@ -1569,6 +1843,11 @@ const authEmail    = document.getElementById('auth-email');
 const authPassword = document.getElementById('auth-password');
 const authConfirm  = document.getElementById('auth-confirm');
 const confirmGroup = document.getElementById('confirm-group');
+const authNickname = document.getElementById('auth-nickname');
+const authBirthday = document.getElementById('auth-birthday');
+const authSex      = document.getElementById('auth-sex');
+const authAgree    = document.getElementById('auth-agree');
+const signupOnly   = () => document.querySelectorAll('.signup-only');
 const authError    = document.getElementById('auth-error');
 const authTitle    = document.getElementById('auth-title');
 const authSubtitle = document.getElementById('auth-subtitle');
@@ -1588,8 +1867,19 @@ function openAuth(mode) {
   authEmail.value = '';
   authPassword.value = '';
   authConfirm.value = '';
+  authNickname.value = '';
+  authBirthday.value = '';
+  authSex.value = '';
+  authAgree.checked = false;
 
-  if (mode === 'signup') {
+  // Reset confirmation state
+  document.getElementById('auth-form').style.display = '';
+  document.getElementById('auth-toggle').style.display = '';
+  const confirmMsg = document.querySelector('.auth-confirm-msg');
+  if (confirmMsg) confirmMsg.remove();
+
+  const isSignup = mode === 'signup';
+  if (isSignup) {
     authTitle.textContent = 'SIGN UP';
     authSubtitle.textContent = 'CREATE YOUR ACCOUNT';
     authSubmit.textContent = 'SIGN UP';
@@ -1603,6 +1893,10 @@ function openAuth(mode) {
     authToggle.innerHTML = 'Don\'t have an account? <a id="auth-switch">Sign up</a>';
   }
 
+  // Toggle signup-only fields (nickname / birthday / sex / disclaimer)
+  signupOnly().forEach(el => { el.style.display = isSignup ? '' : 'none'; });
+  updateAuthSubmitState();
+
   // Re-bind toggle link
   document.getElementById('auth-switch').addEventListener('click', () => {
     openAuth(mode === 'signup' ? 'login' : 'signup');
@@ -1612,6 +1906,16 @@ function openAuth(mode) {
   setTimeout(() => authEmail.focus(), 400);
 }
 
+/** Disable the SIGN UP button until the disclaimer checkbox is ticked. */
+function updateAuthSubmitState() {
+  if (authMode === 'signup') {
+    authSubmit.disabled = !authAgree.checked;
+  } else {
+    authSubmit.disabled = false;
+  }
+}
+authAgree.addEventListener('change', updateAuthSubmitState);
+
 function closeAuth() {
   authModal.classList.remove('on');
 }
@@ -1620,7 +1924,11 @@ function updateAuthUI() {
   if (API.isLoggedIn() && API.user) {
     authButtons.style.display = 'none';
     userRow.style.display = '';
-    userAvatar.textContent = API.user.email.charAt(0).toUpperCase();
+    const label = (API.user.nickname || API.user.email || '?').charAt(0).toUpperCase();
+    userAvatar.textContent = label;
+    userAvatar.title = API.user.nickname
+      ? `${API.user.nickname} — click to edit profile`
+      : 'Click to edit profile';
   } else {
     authButtons.style.display = '';
     userRow.style.display = 'none';
@@ -1637,10 +1945,40 @@ authModal.addEventListener('click', (e) => {
   if (e.target === authModal) closeAuth();
 });
 
-document.getElementById('btn-logout').addEventListener('click', () => {
-  API.logout();
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  await API.logout();
   updateAuthUI();
 });
+
+// Show "check your email" confirmation
+function showEmailConfirmation(email) {
+  const card = document.querySelector('.auth-card');
+  const form = document.getElementById('auth-form');
+  const toggle = document.getElementById('auth-toggle');
+
+  authTitle.textContent = 'CHECK YOUR EMAIL';
+  authSubtitle.textContent = 'ALMOST THERE';
+  form.style.display = 'none';
+  toggle.style.display = 'none';
+
+  // Insert confirmation message
+  let msg = card.querySelector('.auth-confirm-msg');
+  if (!msg) {
+    msg = document.createElement('div');
+    msg.className = 'auth-confirm-msg';
+    card.appendChild(msg);
+  }
+  msg.innerHTML = `
+    <div class="auth-confirm-icon">◈</div>
+    <div class="auth-confirm-text">
+      We sent a confirmation link to
+    </div>
+    <div class="auth-confirm-email">${email}</div>
+    <div class="auth-confirm-hint">
+      Click the link in your email, then come back and log in.
+    </div>
+  `;
+}
 
 // Submit button click
 authSubmit.addEventListener('click', async () => {
@@ -1658,9 +1996,20 @@ authSubmit.addEventListener('click', async () => {
       if (password.length < 6) {
         throw new Error('Password must be at least 6 characters');
       }
-      await API.register(email, password);
+      if (!authAgree.checked) {
+        throw new Error('Please accept the disclaimer to continue');
+      }
+      await API.register(email, password, {
+        nickname:           authNickname.value.trim(),
+        birthday:           authBirthday.value || null,
+        sex:                authSex.value || null,
+        disclaimerAccepted: true,
+      });
+      // Pull profile info so the avatar shows the nickname initial
+      try { await API.getProfile(); } catch (e) { /* non-fatal */ }
     } else {
       await API.login(email, password);
+      try { await API.getProfile(); } catch (e) { /* non-fatal */ }
     }
 
     // Success — close modal, init project, update UI
@@ -1670,14 +2019,89 @@ authSubmit.addEventListener('click', async () => {
   } catch (err) {
     authError.textContent = err.message;
   } finally {
-    authSubmit.disabled = false;
+    updateAuthSubmitState();
   }
 });
 
 /* Enter key on inputs triggers submit */
-[authEmail, authPassword, authConfirm].forEach(input => {
+[authEmail, authPassword, authConfirm, authNickname, authBirthday].forEach(input => {
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') authSubmit.click();
+    if (e.key === 'Enter' && !authSubmit.disabled) authSubmit.click();
+  });
+});
+
+/* ═══════════════════════════════════════════════
+   PROFILE MODAL
+═══════════════════════════════════════════════ */
+const profileModal    = document.getElementById('profile-modal');
+const profileClose    = document.getElementById('profile-close');
+const profileEmail    = document.getElementById('profile-email');
+const profileNickname = document.getElementById('profile-nickname');
+const profileBirthday = document.getElementById('profile-birthday');
+const profileSex      = document.getElementById('profile-sex');
+const profileError    = document.getElementById('profile-error');
+const profileSuccess  = document.getElementById('profile-success');
+const profileSave     = document.getElementById('profile-save');
+
+async function openProfile() {
+  profileError.textContent = '';
+  profileSuccess.textContent = '';
+  profileSave.disabled = true;
+  profileSave.textContent = 'LOADING...';
+  profileModal.classList.add('on');
+
+  try {
+    const me = await API.getProfile();
+    profileEmail.textContent   = me.email || '';
+    profileNickname.value      = me.nickname || '';
+    profileBirthday.value      = me.birthday || '';
+    profileSex.value           = me.sex || '';
+  } catch (e) {
+    profileError.textContent = 'Failed to load profile';
+  } finally {
+    profileSave.disabled = false;
+    profileSave.textContent = 'SAVE CHANGES';
+  }
+}
+
+function closeProfile() {
+  profileModal.classList.remove('on');
+}
+
+userAvatar.addEventListener('click', () => {
+  if (API.isLoggedIn()) openProfile();
+});
+profileClose.addEventListener('click', closeProfile);
+profileModal.addEventListener('click', (e) => {
+  if (e.target === profileModal) closeProfile();
+});
+
+profileSave.addEventListener('click', async () => {
+  profileError.textContent = '';
+  profileSuccess.textContent = '';
+  profileSave.disabled = true;
+  profileSave.textContent = 'SAVING...';
+
+  try {
+    await API.updateProfile({
+      nickname: profileNickname.value.trim(),
+      birthday: profileBirthday.value || null,
+      sex:      profileSex.value || null,
+    });
+    profileSuccess.textContent = 'Saved ✓';
+    updateAuthUI();
+    setTimeout(closeProfile, 800);
+  } catch (err) {
+    profileError.textContent = err.message || 'Failed to save';
+  } finally {
+    profileSave.disabled = false;
+    profileSave.textContent = 'SAVE CHANGES';
+  }
+});
+
+[profileNickname, profileBirthday].forEach(inp => {
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') profileSave.click();
   });
 });
 
@@ -1809,12 +2233,12 @@ bindManageBilling();
 
 /* ── Init auth on page load ── */
 (async () => {
+  // API.init() checks Supabase session automatically
+  await API.init();
   if (API.isLoggedIn()) {
-    const me = await API.getMe();
-    if (me) {
-      await API.init();
-      updatePricingUI();
-    }
+    // Pull profile so the avatar shows the nickname initial
+    try { await API.getProfile(); } catch (e) { /* non-fatal */ }
+    updatePricingUI();
   }
   updateAuthUI();
 })();

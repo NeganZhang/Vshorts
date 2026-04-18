@@ -183,48 +183,47 @@
       pointer-events: none;
     }
 
-    /* text area */
+    /* real textarea — styled to look like plain paper text */
     #typed-text {
+      width: 100%;
+      min-height: 1.8em;
+      max-height: 50vh;
+      padding: 0;
+      margin: 0;
+      border: 0;
+      outline: 0;
+      resize: none;
+      background: transparent;
       font-family: 'Courier New', monospace;
       font-size: 15px;
       line-height: 1.8;
       color: var(--white);
+      caret-color: var(--accent);
       white-space: pre-wrap;
       word-break: break-word;
-      min-height: 1.8em;
+      overflow-wrap: break-word;
       position: relative;
-      z-index: 2;
+      z-index: 3;
+      /* glowing caret – mimic the old cursor feel */
+      text-shadow: 0 0 1px rgba(255,255,255,.08);
+    }
+    #typed-text::placeholder {
+      color: rgba(255,255,255,.22);
+      font-family: 'Courier New', monospace;
+      font-size: 15px;
+      line-height: 1.8;
+    }
+    /* native caret styled + "blinking" look is handled by the browser */
+    #typed-text::selection {
+      background: rgba(0,212,255,.35);
+      color: #fff;
     }
 
-    /* blinking cursor */
-    #cursor {
-      display: inline-block;
-      width: 2px; height: 1.2em;
-      background: var(--accent);
-      animation: blink 1s step-end infinite;
-      vertical-align: text-bottom;
-      margin-left: 1px;
-      opacity: 0;
-      box-shadow: 0 0 6px var(--accent);
-    }
-    #cursor.on { opacity: 1; }
+    /* keep animation namespace used elsewhere */
     @keyframes blink {
       0%, 50% { opacity: 1; }
       51%, 100% { opacity: 0; }
     }
-
-    /* placeholder */
-    #placeholder {
-      position: absolute;
-      top: 32px; left: 36px;
-      font-family: 'Courier New', monospace;
-      font-size: 15px;
-      color: rgba(255,255,255,.22);
-      pointer-events: none;
-      transition: opacity .3s ease;
-      z-index: 3;
-    }
-    #placeholder.hidden { opacity: 0; }
 
     /* clack flash */
     .clack-flash {
@@ -602,12 +601,17 @@
 
   <div id="typewriter">
 
-    <!-- glass paper input -->
+    <!-- glass paper input (real textarea — supports IME, copy/paste, etc.) -->
     <div id="paper-input">
-      <div id="text-row">
-        <span id="typed-text"></span><span id="cursor"></span>
-      </div>
-      <div id="placeholder">Click here & describe your video idea...</div>
+      <textarea
+        id="typed-text"
+        spellcheck="false"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        maxlength="2000"
+        rows="1"
+        placeholder="Click here & describe your video idea... (支持中文输入)"></textarea>
     </div>
 
     <!-- typewriter body -->
@@ -673,6 +677,7 @@
   <button id="new-btn">WRITE ANOTHER →</button>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/api.js"></script>
 <script>
 /* ═══════════════════════════════════════════════
@@ -711,81 +716,82 @@ KEY_LAYOUT.split('').forEach(ch => {
 });
 
 /* ═══════════════════════════════════════════════
-   INPUT — GLASS PAPER TYPING
+   INPUT — REAL TEXTAREA (supports IME / copy / paste / select)
 ═══════════════════════════════════════════════ */
 const paperInput = document.getElementById('paper-input');
-const typedText  = document.getElementById('typed-text');
-const cursor     = document.getElementById('cursor');
-const placeholder = document.getElementById('placeholder');
+const typedText  = document.getElementById('typed-text');          // real <textarea>
 const enterHint  = document.getElementById('enter-hint');
 const roller     = document.getElementById('tw-roller');
 
-let isFocused    = false;
-let textContent  = '';
-let hasTyped     = false;
+/** Single source of truth — read directly off the textarea. */
+const getText = () => typedText.value;
 
-/* Click to focus */
-paperInput.addEventListener('click', () => {
-  isFocused = true;
-  paperInput.classList.add('focused');
-  cursor.classList.add('on');
-});
+let hasTyped  = false;
+let composing = false;        // true while IME is composing (e.g. pinyin → 汉字)
+let randomKeys = 'QWERTYUIOPASDFGHJKLZXCVBNM'.split('');
 
-/* click outside to unfocus */
-document.addEventListener('click', e => {
-  if (!paperInput.contains(e.target) && !e.target.closest('#workspace')) {
-    isFocused = false;
-    paperInput.classList.remove('focused');
-    cursor.classList.remove('on');
+/* Click anywhere on the paper focuses the textarea */
+paperInput.addEventListener('mousedown', (e) => {
+  if (e.target !== typedText) {
+    e.preventDefault();
+    typedText.focus();
   }
 });
 
-/* Keyboard handler */
-document.addEventListener('keydown', e => {
-  if (!isFocused) return;
+typedText.addEventListener('focus', () => paperInput.classList.add('focused'));
+typedText.addEventListener('blur',  () => paperInput.classList.remove('focused'));
 
-  /* ENTER → generate */
-  if (e.key === 'Enter' && textContent.trim().length > 0) {
+/* Auto-grow the textarea as the user types */
+function autoGrow() {
+  typedText.style.height = 'auto';
+  typedText.style.height = Math.min(typedText.scrollHeight, window.innerHeight * 0.5) + 'px';
+}
+
+/* IME awareness — don't run key animations mid-composition */
+typedText.addEventListener('compositionstart', () => { composing = true; });
+typedText.addEventListener('compositionend',   () => { composing = false; });
+
+/* Fires on every value change (typing, paste, delete, IME commit, cut, etc.) */
+typedText.addEventListener('input', (e) => {
+  autoGrow();
+
+  const nowHas = getText().trim().length > 0;
+  if (nowHas && !hasTyped) {
+    hasTyped = true;
+    enterHint.classList.add('show');
+  } else if (!nowHas && hasTyped) {
+    hasTyped = false;
+    enterHint.classList.remove('show');
+  }
+
+  // Visual feedback — skip while IME is composing so pinyin keys don't flash wildly
+  if (composing) return;
+  shakeRoller();
+
+  if (e.inputType === 'insertText' && e.data) {
+    // flash the matching letter key for ASCII, or a random one for CJK/emoji/etc.
+    const ch = e.data.length === 1 && /[A-Za-z.,]/.test(e.data)
+      ? e.data.toUpperCase()
+      : randomKeys[Math.floor(Math.random() * randomKeys.length)];
+    hitKey(ch);
+    spawnClack();
+  } else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertCompositionText') {
+    // paste or committed IME candidate — a single clack is enough
+    hitKey(randomKeys[Math.floor(Math.random() * randomKeys.length)]);
+    spawnClack();
+  }
+});
+
+/* Keydown — handle Enter (generate) vs Shift+Enter (newline), respecting IME */
+typedText.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && !composing && !e.isComposing) {
+    // `e.isComposing` is true while IME candidate window is open in most browsers
+    if (getText().trim().length === 0) return;
     e.preventDefault();
     hitKey('⏎');
     startGeneration();
-    return;
-  }
-
-  /* Backspace */
-  if (e.key === 'Backspace') {
-    e.preventDefault();
-    textContent = textContent.slice(0, -1);
-    renderText();
-    shakeRoller();
-    return;
-  }
-
-  /* printable characters */
-  if (e.key.length === 1) {
-    e.preventDefault();
-    textContent += e.key;
-    renderText();
-    hitKey(e.key.toUpperCase());
-    spawnClack();
-    shakeRoller();
-
-    if (!hasTyped) {
-      hasTyped = true;
-      placeholder.classList.add('hidden');
-      enterHint.classList.add('show');
-    }
   }
 });
-
-function renderText() {
-  typedText.textContent = textContent;
-  if (textContent.length === 0 && hasTyped) {
-    placeholder.classList.remove('hidden');
-    enterHint.classList.remove('show');
-    hasTyped = false;
-  }
-}
 
 /* Typewriter key hit animation */
 function hitKey(ch) {
@@ -795,14 +801,15 @@ function hitKey(ch) {
   setTimeout(() => el.classList.remove('hit'), 120);
 }
 
-/* Clack flash at cursor */
+/* Clack flash near the caret */
 function spawnClack() {
   const flash = document.createElement('div');
   flash.className = 'clack-flash';
-  const rect = cursor.getBoundingClientRect();
+  // Approximate caret position: bottom-right of the textarea content
   const pRect = paperInput.getBoundingClientRect();
-  flash.style.left = (rect.left - pRect.left) + 'px';
-  flash.style.top  = (rect.top  - pRect.top)  + 'px';
+  const tRect = typedText.getBoundingClientRect();
+  flash.style.left = (tRect.right - pRect.left - 6) + 'px';
+  flash.style.top  = (tRect.bottom - pRect.top - 22) + 'px';
   paperInput.appendChild(flash);
   setTimeout(() => flash.remove(), 260);
 }
@@ -824,8 +831,7 @@ const dlWrap     = document.getElementById('dl-wrap');
 const newBtn     = document.getElementById('new-btn');
 
 async function startGeneration() {
-  isFocused = false;
-  cursor.classList.remove('on');
+  typedText.blur();
 
   /* slide paper up */
   paperInput.style.transition = 'transform .5s ease, opacity .5s ease';
@@ -839,7 +845,7 @@ async function startGeneration() {
 
   try {
     /* Call backend API */
-    const { id: scriptId } = await API.generateScript(textContent);
+    const { id: scriptId } = await API.generateScript(getText().trim());
 
     /* Poll until done */
     const script = await API.poll(async () => {
@@ -914,17 +920,18 @@ newBtn.addEventListener('click', () => {
   dlWrap.classList.remove('show');
   newBtn.classList.remove('show');
 
-  textContent = '';
+  typedText.value = '';
+  typedText.style.height = '';
   hasTyped = false;
-  typedText.textContent = '';
-  placeholder.classList.remove('hidden');
   enterHint.classList.remove('show');
+  resCursor.style.display = '';
 
   paperInput.style.transform = '';
   paperInput.style.opacity   = '';
 
   setTimeout(() => {
     workspace.classList.add('on');
+    typedText.focus();
   }, 400);
 });
 

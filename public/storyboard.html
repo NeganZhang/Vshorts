@@ -672,8 +672,11 @@
   <div id="auto-bar">
     <input id="auto-prompt" type="text"
       placeholder="Describe your full story... AI will split it into scenes automatically">
+    <button id="auto-upload" class="tb-btn" title="Upload .txt or .md script">📎 UPLOAD</button>
+    <input id="auto-upload-file" type="file" accept=".txt,.md,text/plain,text/markdown" style="display:none">
     <input class="scene-num-input" type="number" id="auto-scene-num" value="4" min="2" max="8" title="Number of scenes">
     <button id="auto-generate">GENERATE →</button>
+    <span id="auto-upload-hint" style="font-size:11px;color:rgba(255,255,255,.45);margin-left:4px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
   </div>
 
   <!-- timeline -->
@@ -697,6 +700,7 @@
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="/js/api.js"></script>
 <script>
 /* ═══════════════════════════════════════════════
@@ -976,6 +980,47 @@ document.getElementById('btn-clear').addEventListener('click', () => {
 });
 
 document.getElementById('auto-generate').addEventListener('click', autoGenerate);
+
+/* ── UPLOAD-YOUR-OWN-SCRIPT (auto-mode) ──────── */
+(() => {
+  const uploadBtn  = document.getElementById('auto-upload');
+  const uploadInp  = document.getElementById('auto-upload-file');
+  const uploadHint = document.getElementById('auto-upload-hint');
+  const promptEl   = document.getElementById('auto-prompt');
+  if (!uploadBtn || !uploadInp || !promptEl) return;
+
+  uploadBtn.addEventListener('click', () => uploadInp.click());
+
+  uploadInp.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 200 * 1024) {
+      uploadHint.style.color = '#ff6b6b';
+      uploadHint.textContent = 'File too large (max 200KB)';
+      uploadInp.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      let text = String(reader.result || '');
+      if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);      // strip UTF-8 BOM
+      text = text.replace(/\r\n/g, '\n').trim();
+      const truncated = text.length > 2000;
+      if (truncated) text = text.slice(0, 2000);
+      promptEl.value = text;
+      uploadHint.style.color = 'rgba(180,0,255,.85)';
+      uploadHint.textContent = `Loaded ${file.name} — ${text.length} chars${truncated ? ' (truncated to 2000)' : ''}`;
+    };
+    reader.onerror = () => {
+      uploadHint.style.color = '#ff6b6b';
+      uploadHint.textContent = 'Failed to read file';
+    };
+    reader.readAsText(file, 'utf-8');
+    uploadInp.value = '';   // allow re-picking the same file
+  });
+})();
 
 // aspect ratio chips
 document.querySelectorAll('.aspect-chip').forEach(chip => {

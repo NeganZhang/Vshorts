@@ -1,40 +1,79 @@
 /**
  * VSHORT — Shared API Client
+ * Requires: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
  * Included by all pages via <script src="/js/api.js">
  */
+
+// ─── Supabase client (uses global from CDN) ────
+const _supabase = window.supabase.createClient(
+  'https://seolaotjqmyrtujehbfo.supabase.co',
+  'sb_publishable_XP4UxVBA0H9jNxcdtO9LUQ_ra8dln8n'
+);
+
 const API = {
   base: '/api',
 
-  // ─── Auth state ────────────────────────────────
-  token: localStorage.getItem('vshort_token') || null,
+  // ─── Auth state (synced from Supabase session) ─
   user: null,
+  _session: null,
 
-  /** Auth headers for all requests */
-  _headers(extra = {}) {
+  /** Get current access token from Supabase session (for Express API calls) */
+  async _getToken() {
+    const { data } = await _supabase.auth.getSession();
+    this._session = data.session;
+    return data.session?.access_token || null;
+  },
+
+  /** Auth headers for Express API calls */
+  async _headers(extra = {}) {
+    const token = await this._getToken();
     const h = { 'Content-Type': 'application/json', ...extra };
-    if (this.token) h['Authorization'] = `Bearer ${this.token}`;
+    if (token) h['Authorization'] = `Bearer ${token}`;
     return h;
   },
 
-  _authHeaders() {
+  async _authHeaders() {
+    const token = await this._getToken();
     const h = {};
-    if (this.token) h['Authorization'] = `Bearer ${this.token}`;
+    if (token) h['Authorization'] = `Bearer ${token}`;
     return h;
   },
 
-  // ─── Auth methods ──────────────────────────────
-  async register(email, password) {
+  // ─── Auth methods (server-side via Supabase Admin) ──
+  /**
+   * Register a new account.
+   * @param {string} email
+   * @param {string} password
+   * @param {object} [extras] { nickname, birthday, sex, disclaimerAccepted }
+   */
+  async register(email, password, extras = {}) {
+    const body = {
+      email,
+      password,
+      nickname:            extras.nickname || null,
+      birthday:            extras.birthday || null,
+      sex:                 extras.sex || null,
+      disclaimerAccepted:  !!extras.disclaimerAccepted,
+    };
+
     const res = await fetch(`${this.base}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify(body),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Registration failed');
-    this.token = data.token;
+
+    // Set Supabase session with returned tokens
+    if (data.access_token) {
+      await _supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      });
+      this._session = { access_token: data.access_token };
+    }
     this.user = data.user;
-    localStorage.setItem('vshort_token', data.token);
-    return data;
+    return { user: this.user };
   },
 
   async login(email, password) {
@@ -45,49 +84,90 @@ const API = {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Login failed');
-    this.token = data.token;
+
+    // Set Supabase session with returned tokens
+    if (data.access_token) {
+      await _supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+      });
+      this._session = { access_token: data.access_token };
+    }
     this.user = data.user;
-    localStorage.setItem('vshort_token', data.token);
-    return data;
+    return { user: this.user };
   },
 
-  logout() {
-    this.token = null;
+  async logout() {
+    await _supabase.auth.signOut();
     this.user = null;
+    this._session = null;
     this.projectId = null;
-    localStorage.removeItem('vshort_token');
     localStorage.removeItem('vshort_project');
   },
 
   async getMe() {
-    if (!this.token) return null;
-    const res = await fetch(`${this.base}/auth/me`, {
-      headers: this._authHeaders(),
-    });
-    if (!res.ok) {
-      this.logout();
+    const { data, error } = await _supabase.auth.getUser();
+    if (error || !data.user) {
+      this.user = null;
+      this._session = null;
       return null;
     }
-    this.user = await res.json();
+    this.user = { id: data.user.id, email: data.user.email };
     return this.user;
   },
 
+  /** Fetch the full profile (nickname / birthday / sex) from our API. */
+  async getProfile() {
+    const res = await fetch(`${this.base}/auth/me`, {
+      headers: await this._authHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to load profile');
+    const data = await res.json();
+    // Mirror profile fields onto the cached user for convenience
+    if (this.user) {
+      this.user.nickname = data.nickname;
+      this.user.birthday = data.birthday;
+      this.user.sex      = data.sex;
+    }
+    return data;
+  },
+
+  /** Update profile fields. Pass only the keys you want to change. */
+  async updateProfile(fields) {
+    const res = await fetch(`${this.base}/auth/profile`, {
+      method: 'PATCH',
+      headers: await this._headers(),
+      body: JSON.stringify(fields),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to update profile');
+    if (this.user) {
+      if ('nickname' in data) this.user.nickname = data.nickname;
+      if ('birthday' in data) this.user.birthday = data.birthday;
+      if ('sex'      in data) this.user.sex      = data.sex;
+    }
+    return data;
+  },
+
   isLoggedIn() {
-    return !!this.token;
+    return !!this.user;
   },
 
   // ─── Project context ───────────────────────────
   projectId: null,
 
-  /** Initialize: check auth, get or create project */
+  /** Initialize: check Supabase session, get or create project */
   async init() {
-    // Check auth
-    if (this.token) {
-      const me = await this.getMe();
-      if (!me) return null; // token invalid
-    }
+    // Restore session from Supabase (auto-persisted)
+    const { data: { session } } = await _supabase.auth.getSession();
+    this._session = session;
 
-    if (!this.token) return null; // not logged in
+    if (session?.user) {
+      this.user = { id: session.user.id, email: session.user.email };
+    } else {
+      this.user = null;
+      return null;
+    }
 
     const params = new URLSearchParams(window.location.search);
     let pid = params.get('project');
@@ -103,7 +183,7 @@ const API = {
     if (pid) {
       try {
         const res = await fetch(`${this.base}/projects/${pid}`, {
-          headers: this._authHeaders(),
+          headers: await this._authHeaders(),
         });
         if (res.ok) {
           this.projectId = pid;
@@ -114,21 +194,24 @@ const API = {
 
     // Create a new default project
     const project = await this.createProject('My Project');
-    this.projectId = project.id;
-    localStorage.setItem('vshort_project', project.id);
-    return project.id;
+    if (project && project.id) {
+      this.projectId = project.id;
+      localStorage.setItem('vshort_project', project.id);
+      return project.id;
+    }
+    return null;
   },
 
   // ─── Projects ──────────────────────────────────
   async listProjects() {
-    const res = await fetch(`${this.base}/projects`, { headers: this._authHeaders() });
+    const res = await fetch(`${this.base}/projects`, { headers: await this._authHeaders() });
     return res.json();
   },
 
   async createProject(name) {
     const res = await fetch(`${this.base}/projects`, {
       method: 'POST',
-      headers: this._headers(),
+      headers: await this._headers(),
       body: JSON.stringify({ name }),
     });
     return res.json();
@@ -136,7 +219,7 @@ const API = {
 
   async getProject(id) {
     const res = await fetch(`${this.base}/projects/${id || this.projectId}`, {
-      headers: this._authHeaders(),
+      headers: await this._authHeaders(),
     });
     return res.json();
   },
@@ -145,7 +228,7 @@ const API = {
   async generateScript(prompt) {
     const res = await fetch(`${this.base}/projects/${this.projectId}/scripts`, {
       method: 'POST',
-      headers: this._headers(),
+      headers: await this._headers(),
       body: JSON.stringify({ prompt }),
     });
     return res.json();
@@ -153,7 +236,7 @@ const API = {
 
   async getScript(scriptId) {
     const res = await fetch(`${this.base}/projects/${this.projectId}/scripts/${scriptId}`, {
-      headers: this._authHeaders(),
+      headers: await this._authHeaders(),
     });
     return res.json();
   },
@@ -161,7 +244,7 @@ const API = {
   // ─── Scenes ────────────────────────────────────
   async getScenes() {
     const res = await fetch(`${this.base}/projects/${this.projectId}/scenes`, {
-      headers: this._authHeaders(),
+      headers: await this._authHeaders(),
     });
     return res.json();
   },
@@ -169,7 +252,7 @@ const API = {
   async addScene(data) {
     const res = await fetch(`${this.base}/projects/${this.projectId}/scenes`, {
       method: 'POST',
-      headers: this._headers(),
+      headers: await this._headers(),
       body: JSON.stringify(data),
     });
     return res.json();
@@ -178,7 +261,7 @@ const API = {
   async updateScene(sceneId, data) {
     const res = await fetch(`${this.base}/projects/${this.projectId}/scenes/${sceneId}`, {
       method: 'PUT',
-      headers: this._headers(),
+      headers: await this._headers(),
       body: JSON.stringify(data),
     });
     return res.json();
@@ -187,7 +270,7 @@ const API = {
   async deleteScene(sceneId) {
     const res = await fetch(`${this.base}/projects/${this.projectId}/scenes/${sceneId}`, {
       method: 'DELETE',
-      headers: this._authHeaders(),
+      headers: await this._authHeaders(),
     });
     return res.json();
   },
@@ -195,7 +278,7 @@ const API = {
   async generateSceneImage(sceneId) {
     const res = await fetch(`${this.base}/projects/${this.projectId}/scenes/${sceneId}/generate`, {
       method: 'POST',
-      headers: this._authHeaders(),
+      headers: await this._authHeaders(),
     });
     return res.json();
   },
@@ -203,7 +286,7 @@ const API = {
   async generateAllScenes() {
     const res = await fetch(`${this.base}/projects/${this.projectId}/scenes/generate-all`, {
       method: 'POST',
-      headers: this._authHeaders(),
+      headers: await this._authHeaders(),
     });
     return res.json();
   },
@@ -211,7 +294,7 @@ const API = {
   async autoGenerateScenes(prompt, numScenes) {
     const res = await fetch(`${this.base}/projects/${this.projectId}/scenes/auto-generate`, {
       method: 'POST',
-      headers: this._headers(),
+      headers: await this._headers(),
       body: JSON.stringify({ prompt, numScenes }),
     });
     return res.json();
@@ -219,13 +302,14 @@ const API = {
 
   // ─── Clips ─────────────────────────────────────
   async uploadClips(files, onProgress) {
+    const token = await this._getToken();
     return new Promise((resolve, reject) => {
       const formData = new FormData();
       for (const f of files) formData.append('files', f);
 
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${this.base}/projects/${this.projectId}/clips`);
-      if (this.token) xhr.setRequestHeader('Authorization', `Bearer ${this.token}`);
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
 
       if (onProgress) {
         xhr.upload.onprogress = (e) => {
@@ -247,7 +331,7 @@ const API = {
 
   async getClips() {
     const res = await fetch(`${this.base}/projects/${this.projectId}/clips`, {
-      headers: this._authHeaders(),
+      headers: await this._authHeaders(),
     });
     return res.json();
   },
@@ -255,7 +339,7 @@ const API = {
   async deleteClip(clipId) {
     const res = await fetch(`${this.base}/projects/${this.projectId}/clips/${clipId}`, {
       method: 'DELETE',
-      headers: this._authHeaders(),
+      headers: await this._authHeaders(),
     });
     return res.json();
   },
@@ -264,7 +348,7 @@ const API = {
   async startEditJob(config) {
     const res = await fetch(`${this.base}/projects/${this.projectId}/edit-jobs`, {
       method: 'POST',
-      headers: this._headers(),
+      headers: await this._headers(),
       body: JSON.stringify({ config }),
     });
     return res.json();
@@ -272,7 +356,7 @@ const API = {
 
   async getEditJob(jobId) {
     const res = await fetch(`${this.base}/projects/${this.projectId}/edit-jobs/${jobId}`, {
-      headers: this._authHeaders(),
+      headers: await this._authHeaders(),
     });
     return res.json();
   },
@@ -294,7 +378,7 @@ const API = {
   // ─── Billing / Stripe ──────────────────────────
   async getSubscription() {
     const res = await fetch(`${this.base}/billing/subscription`, {
-      headers: this._authHeaders(),
+      headers: await this._authHeaders(),
     });
     return res.json();
   },
@@ -302,7 +386,7 @@ const API = {
   async createCheckout(plan) {
     const res = await fetch(`${this.base}/billing/checkout`, {
       method: 'POST',
-      headers: this._headers(),
+      headers: await this._headers(),
       body: JSON.stringify({ plan }),
     });
     return res.json();
@@ -311,14 +395,14 @@ const API = {
   async openBillingPortal() {
     const res = await fetch(`${this.base}/billing/portal`, {
       method: 'POST',
-      headers: this._authHeaders(),
+      headers: await this._authHeaders(),
     });
     return res.json();
   },
 
   async getUsage() {
     const res = await fetch(`${this.base}/billing/usage`, {
-      headers: this._authHeaders(),
+      headers: await this._authHeaders(),
     });
     return res.json();
   },
