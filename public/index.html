@@ -1013,6 +1013,8 @@
     .card-tag  { font-size: 9px; letter-spacing: 4px; opacity: .45; }
     .card-name { font-size: 20px; font-weight: 800; letter-spacing: 2px; }
     .card-desc { font-size: 13px; line-height: 1.65; color: rgba(255,255,255,.48); flex: 1; }
+    /* Keep the clean flat pill — just add a soft drop shadow so it's
+       not sitting dead-flat on the page. No overlays, no insets. */
     .card-btn  {
       align-self: flex-start;
       padding: 10px 24px;
@@ -1021,8 +1023,12 @@
       font-size: 12px; font-weight: 700; letter-spacing: 1.5px;
       cursor: pointer;
       transition: transform .25s ease, box-shadow .25s ease;
+      box-shadow: 0 4px 14px rgba(0,0,0,.25);
     }
-    .card-btn:hover { transform: translateX(5px); }
+    .card-btn:hover {
+      transform: translateX(5px);
+      box-shadow: 0 8px 22px rgba(0,0,0,.38);
+    }
 
     /* ─── SCROLL HINT ────────────────────────────────── */
     #scroll-hint {
@@ -1549,11 +1555,53 @@ const flash   = document.getElementById('flash');
 let introUsed = false;
 
 /* ═══════════════════════════════════════════════
-   SKIP INTRO if coming back from a sub-page
+   SKIP INTRO if coming back from a sub-page.
+   Hash format: "#skip-intro"   → default to page 0 (Scripts)
+                "#skip-intro-N" → land on page N (0=scripts, 1=storyboard, 2=vshorts)
 ═══════════════════════════════════════════════ */
-if (window.location.hash === '#skip-intro') {
+const skipMatch = window.location.hash.match(/^#skip-intro(?:-(\d))?$/);
+if (skipMatch) {
+  const targetPage = Math.max(0, Math.min(2, parseInt(skipMatch[1]) || 0));
   introUsed = true;
   intro.style.display = 'none';
+
+  // If we're returning from a non-default page, snap all the dial/card
+  // state to that page BEFORE the app fades in, so the user lands on
+  // the correct view without a jump.
+  if (targetPage !== 0) {
+    cur = targetPage;
+    const svc = SVCS[cur];
+    const dIcon  = document.getElementById('d-icon');
+    const dLabel = document.getElementById('d-label');
+    dIcon.textContent  = svc.icon;
+    dIcon.style.color  = svc.color;
+    dIcon.style.filter = `drop-shadow(0 0 14px ${svc.color})`;
+    dLabel.textContent = svc.name;
+    document.getElementById('d-glow').style.borderColor  = svc.color;
+    document.getElementById('d-pulse').style.borderColor = svc.color;
+    document.getElementById('amb').style.background =
+      `radial-gradient(ellipse 65% 65% at 50% 52%, ${svc.bg}, transparent 100%)`;
+    document.documentElement.style.setProperty('--accent', svc.color);
+    document.querySelector('.logo em').style.color = svc.color;
+    // Dial ring angle
+    dialDeg = cur * 120;
+    document.getElementById('d-ring').style.transform = `rotate(${dialDeg}deg)`;
+    // Active card
+    document.querySelectorAll('.card').forEach(c => c.classList.toggle('active', +c.dataset.i === cur));
+    // Pips
+    document.querySelectorAll('.pip').forEach((p, i) => {
+      p.classList.toggle('active', i === cur);
+      p.style.background = i === cur ? svc.color : 'rgba(255,255,255,.18)';
+      p.style.boxShadow  = i === cur ? `0 0 8px ${svc.color}` : 'none';
+    });
+    // Side-counter bars + label
+    document.querySelectorAll('.sc-bar').forEach((b, i) => {
+      b.classList.toggle('active', i === cur);
+      b.style.background = i === cur ? svc.color : 'rgba(255,255,255,.12)';
+      b.style.boxShadow  = i === cur ? `0 0 8px ${svc.color}` : 'none';
+    });
+    document.getElementById('sc-label').textContent = `0${cur + 1} / 03`;
+  }
 
   /* start hidden, then swoosh in */
   app.style.opacity = '0';

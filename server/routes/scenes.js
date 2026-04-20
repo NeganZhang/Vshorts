@@ -107,26 +107,28 @@ router.delete('/:projectId/scenes/:sceneId', (req, res) => {
 // ─── Generate image for one scene ──────────────
 router.post('/:projectId/scenes/:sceneId/generate', (req, res) => {
   const { sceneId, projectId } = req.params;
+  const aspect = (req.body && req.body.aspect) || null;
   const scene = db.prepare(
     'SELECT * FROM scenes WHERE id = ? AND project_id = ?'
   ).get(sceneId, projectId);
   if (!scene) return res.status(404).json({ error: 'Scene not found' });
 
   db.prepare('UPDATE scenes SET status = ? WHERE id = ?').run('generating', sceneId);
-  generateSceneImage(sceneId, scene);
+  generateSceneImage(sceneId, scene, { aspect });
 
   res.json({ id: sceneId, status: 'generating' });
 });
 
 // ─── Generate all scenes ───────────────────────
 router.post('/:projectId/scenes/generate-all', (req, res) => {
+  const aspect = (req.body && req.body.aspect) || null;
   const scenes = db.prepare(
     'SELECT * FROM scenes WHERE project_id = ? ORDER BY sort_order'
   ).all(req.params.projectId);
 
   scenes.forEach((scene, i) => {
     db.prepare('UPDATE scenes SET status = ? WHERE id = ?').run('generating', scene.id);
-    setTimeout(() => generateSceneImage(scene.id, scene), i * 500);
+    setTimeout(() => generateSceneImage(scene.id, scene, { aspect }), i * 500);
   });
 
   res.json({ generating: scenes.length });
@@ -141,6 +143,7 @@ router.post('/:projectId/scenes/auto-generate', async (req, res) => {
     if (prompt.length > 2000) return res.status(400).json({ error: 'Prompt too long' });
 
     const numScenes = Math.min(MAX_SCENES, Math.max(2, parseInt(req.body.numScenes) || 4));
+    const aspect    = req.body.aspect || null;
 
     // ─── Build scene plan ─────────────────────────
     // Prefer Kimi's semantic split; fall back to the original
@@ -191,7 +194,7 @@ router.post('/:projectId/scenes/auto-generate', async (req, res) => {
     createdIds.forEach((id, i) => {
       const scene = db.prepare('SELECT * FROM scenes WHERE id = ?').get(id);
       db.prepare('UPDATE scenes SET status = ? WHERE id = ?').run('generating', id);
-      setTimeout(() => generateSceneImage(id, scene), i * 500);
+      setTimeout(() => generateSceneImage(id, scene, { aspect }), i * 500);
     });
 
     const scenes = db.prepare(

@@ -77,20 +77,33 @@
     }
     .back-btn {
       display: flex; align-items: center; justify-content: center;
-      width: 42px; height: 42px;
-      border: 1px solid rgba(255,255,255,.15);
+      width: 44px; height: 44px;
+      border: 1px solid rgba(255,255,255,.14);
+      border-top-color: rgba(255,255,255,.28);
       border-radius: 50%;
-      background: rgba(255,255,255,.04);
+      background: linear-gradient(180deg,
+        rgba(255,255,255,.08) 0%,
+        rgba(255,255,255,.02) 60%,
+        rgba(180,0,255,.05) 100%);
+      backdrop-filter: blur(20px) saturate(160%);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
       cursor: pointer;
-      transition: background .3s, border-color .3s, transform .3s ease;
-      backdrop-filter: blur(8px);
+      transition: all .25s ease;
       text-decoration: none;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.14) inset,
+        0 4px 14px rgba(0,0,0,.3);
     }
     .back-btn:hover {
-      background: rgba(180,0,255,.1);
-      border-color: rgba(180,0,255,.4);
+      background: linear-gradient(180deg,
+        rgba(180,0,255,.18) 0%,
+        rgba(180,0,255,.06) 100%);
+      border-color: rgba(180,0,255,.45);
       transform: translateY(-2px);
-      box-shadow: 0 4px 14px rgba(180,0,255,.15);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.18) inset,
+        0 0 18px rgba(180,0,255,.3),
+        0 6px 18px rgba(0,0,0,.35);
     }
     .back-btn svg {
       width: 18px; height: 18px;
@@ -100,49 +113,163 @@
     /* ─── MAIN WORKSPACE ────────────────────────── */
     #workspace {
       position: fixed; inset: 0;
-      display: flex; flex-direction: column;
       z-index: 10;
       opacity: 0;
       transition: opacity .6s ease;
-      padding-top: 80px;
     }
     #workspace.on { opacity: 1; }
 
-    /* ─── TOOLBAR ───────────────────────────────── */
-    #toolbar {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 0 32px;
-      height: 56px;
-      flex-shrink: 0;
+    /* ─── INFINITE CANVAS (pan + zoom + drag nodes) ── */
+    #canvas-viewport {
+      position: absolute; inset: 0;
+      overflow: hidden;
+      cursor: grab;
+      /* dot-grid background */
+      background-color: #06060a;
+      background-image:
+        radial-gradient(rgba(255,255,255,.06) 1px, transparent 1px);
+      background-size: 24px 24px;
+      background-position: 0 0;
+    }
+    #canvas-viewport.panning { cursor: grabbing; }
+    #canvas-stage {
+      position: absolute; left: 0; top: 0;
+      width: 1px; height: 1px;          /* logical anchor; nodes are absolute */
+      transform-origin: 0 0;
+      will-change: transform;
+    }
+    #wires-svg {
+      position: absolute; left: -10000px; top: -10000px;
+      width: 20000px; height: 20000px;
+      pointer-events: none;
+      overflow: visible;
+    }
+    #wires-svg path {
+      fill: none;
+      stroke: rgba(180,0,255,.45);
+      stroke-width: 1.5;
+      filter: drop-shadow(0 0 4px rgba(180,0,255,.3));
+    }
+    #wires-svg .wire-label {
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      letter-spacing: 2px;
+      fill: rgba(180,0,255,.7);
+      paint-order: stroke;
+      stroke: #06060a;
+      stroke-width: 4px;
     }
 
+    /* zoom indicator (bottom-right corner) */
+    #zoom-pill {
+      position: fixed; bottom: 84px; right: 24px;
+      z-index: 60;
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px;
+      background: rgba(20,20,30,.7);
+      border: 1px solid rgba(180,0,255,.18);
+      border-radius: 8px;
+      font-size: 10px; letter-spacing: 1.5px;
+      color: rgba(255,255,255,.5);
+      backdrop-filter: blur(20px);
+    }
+    #zoom-pill button {
+      width: 22px; height: 22px;
+      background: linear-gradient(180deg,
+        rgba(255,255,255,.06) 0%,
+        rgba(255,255,255,.01) 100%);
+      border: 1px solid rgba(255,255,255,.10);
+      border-top-color: rgba(255,255,255,.22);
+      border-radius: 6px;
+      color: rgba(255,255,255,.7);
+      cursor: pointer; font-size: 13px;
+      padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .15s ease;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 1px 0 rgba(255,255,255,.10) inset;
+    }
+    #zoom-pill button:hover {
+      background: linear-gradient(180deg,
+        rgba(180,0,255,.25) 0%,
+        rgba(180,0,255,.06) 100%);
+      color: #fff;
+      border-color: rgba(180,0,255,.4);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.15) inset,
+        0 0 10px rgba(180,0,255,.3);
+    }
+
+    /* ─── TOOLBAR (floating overlay) ────────────── */
+    #toolbar {
+      position: fixed; top: 80px; left: 32px; right: 32px;
+      z-index: 50;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 16px;
+      height: 56px;
+      background: rgba(20,20,30,.55);
+      border: 1px solid rgba(180,0,255,.12);
+      border-radius: 14px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.4);
+    }
+
+    /* ─── LIQUID-GLASS MODE TOGGLE ──────────────── */
     .mode-toggle {
       display: flex; gap: 2px;
-      background: rgba(255,255,255,.04);
-      border: 1px solid rgba(255,255,255,.08);
-      border-radius: 10px;
+      /* Highly transparent glass: a thin frosted layer with an inner
+         refraction line on top to sell the "liquid glass" look. */
+      background: linear-gradient(180deg,
+        rgba(255,255,255,.06) 0%,
+        rgba(255,255,255,.015) 60%,
+        rgba(180,0,255,.04) 100%);
+      border: 1px solid rgba(255,255,255,.10);
+      border-top-color: rgba(255,255,255,.18);
+      border-radius: 12px;
       padding: 3px;
+      backdrop-filter: blur(22px) saturate(160%);
+      -webkit-backdrop-filter: blur(22px) saturate(160%);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.08) inset,          /* top highlight     */
+        0 -1px 0 rgba(0,0,0,.25) inset,               /* bottom shadow     */
+        0 4px 18px rgba(0,0,0,.28);                   /* soft drop shadow  */
+      position: relative;
+      overflow: hidden;
     }
+    /* refraction sheen */
+    .mode-toggle::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 12%; right: 12%; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent);
+      pointer-events: none;
+    }
+
     .mode-btn {
-      padding: 8px 20px;
+      padding: 8px 22px;
       border: none;
-      border-radius: 8px;
+      border-radius: 9px;
       background: transparent;
-      color: rgba(255,255,255,.4);
+      color: rgba(255,255,255,.5);
       font-size: 11px;
       font-weight: 700;
       letter-spacing: 2px;
       cursor: pointer;
-      transition: all .3s ease;
+      transition: all .25s ease;
+      position: relative;
     }
     .mode-btn.active {
-      background: var(--accent);
       color: #fff;
-      box-shadow: 0 0 16px rgba(180,0,255,.4);
+      background: linear-gradient(180deg,
+        rgba(180,0,255,.75) 0%,
+        rgba(150,0,220,.65) 100%);
+      box-shadow:
+        0 0 18px rgba(180,0,255,.45),
+        0 1px 0 rgba(255,255,255,.25) inset;
     }
     .mode-btn:hover:not(.active) {
-      color: rgba(255,255,255,.6);
-      background: rgba(255,255,255,.04);
+      color: rgba(255,255,255,.8);
+      background: rgba(255,255,255,.06);
     }
 
     .toolbar-right {
@@ -155,51 +282,97 @@
     }
     .scene-count span { color: var(--accent); font-weight: 700; }
 
+    /* ── Liquid-glass buttons (shared look) ── */
     .tb-btn {
       padding: 9px 20px;
-      border: 1px solid rgba(180,0,255,.3);
-      border-radius: 10px;
-      background: rgba(180,0,255,.08);
+      border: 1px solid rgba(255,255,255,.10);
+      border-top-color: rgba(255,255,255,.22);       /* refraction rim */
+      border-radius: 11px;
+      background: linear-gradient(180deg,
+        rgba(180,0,255,.12) 0%,
+        rgba(180,0,255,.04) 55%,
+        rgba(255,255,255,.02) 100%);
+      backdrop-filter: blur(18px) saturate(160%);
+      -webkit-backdrop-filter: blur(18px) saturate(160%);
       color: var(--accent);
       font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
       cursor: pointer;
-      transition: all .3s ease;
+      transition: all .25s ease;
+      position: relative;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.12) inset,
+        0 -1px 0 rgba(0,0,0,.2) inset,
+        0 2px 10px rgba(0,0,0,.25);
     }
     .tb-btn:hover {
-      background: rgba(180,0,255,.15);
-      border-color: rgba(180,0,255,.5);
-      box-shadow: 0 0 14px rgba(180,0,255,.15);
+      background: linear-gradient(180deg,
+        rgba(180,0,255,.2) 0%,
+        rgba(180,0,255,.08) 60%,
+        rgba(255,255,255,.03) 100%);
+      border-color: rgba(180,0,255,.4);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.18) inset,
+        0 0 18px rgba(180,0,255,.2),
+        0 4px 14px rgba(0,0,0,.3);
+      transform: translateY(-1px);
+    }
+    .tb-btn:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+      transform: none;
     }
     .tb-btn.primary {
-      background: var(--accent);
       color: #fff;
-      border-color: var(--accent);
+      background: linear-gradient(180deg,
+        rgba(200,30,255,.85) 0%,
+        rgba(150,0,220,.7) 100%);
+      border-color: rgba(255,255,255,.18);
+      border-top-color: rgba(255,255,255,.35);
     }
     .tb-btn.primary:hover {
-      box-shadow: 0 0 20px rgba(180,0,255,.4);
+      background: linear-gradient(180deg,
+        rgba(220,50,255,.95) 0%,
+        rgba(170,10,240,.8) 100%);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.3) inset,
+        0 0 24px rgba(180,0,255,.5),
+        0 6px 18px rgba(0,0,0,.35);
       transform: translateY(-1px);
     }
 
-    /* ─── AUTO-MODE PROMPT BAR ──────────────────── */
+    /* ─── AUTO-MODE PROMPT BAR (floating, below toolbar) ── */
     #auto-bar {
       display: none;
-      padding: 0 32px;
-      margin-bottom: 12px;
+      position: fixed;
+      top: 152px; left: 32px; right: 32px;
+      z-index: 50;
+      padding: 10px 16px;
+      background: rgba(20,20,30,.55);
+      border: 1px solid rgba(180,0,255,.12);
+      border-radius: 14px;
+      backdrop-filter: blur(20px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.4);
     }
     #auto-bar.show { display: flex; gap: 12px; align-items: center; }
 
     #auto-prompt {
       flex: 1;
-      padding: 14px 20px;
+      padding: 12px 20px;
       background: rgba(255,255,255,.04);
       border: 1px solid rgba(255,255,255,.1);
       border-radius: 12px;
       color: var(--white);
       font-family: 'Courier New', monospace;
       font-size: 13px;
+      line-height: 1.55;
       outline: none;
       backdrop-filter: blur(20px);
       transition: border-color .3s ease;
+      /* textarea specifics — auto-grow handled in JS */
+      resize: none;
+      min-height: 44px;
+      max-height: 180px;
+      overflow-y: auto;
     }
     #auto-prompt:focus {
       border-color: rgba(180,0,255,.4);
@@ -207,37 +380,105 @@
     }
     #auto-prompt::placeholder { color: rgba(255,255,255,.2); }
 
+    /* ── Minimalist scrollbar — ghosted white pill by default,
+       purple glass glow only when the cursor lands on it. ─── */
+    #auto-prompt::-webkit-scrollbar {
+      width: 8px;
+    }
+    #auto-prompt::-webkit-scrollbar-track {
+      background: transparent;
+      margin: 6px 0;
+    }
+    #auto-prompt::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,.10);          /* semi-transparent, barely there */
+      border-radius: 8px;
+      border: 1px solid transparent;              /* reserve the rim so hover doesn't jitter */
+      transition: background .2s ease, border-color .2s ease, box-shadow .2s ease;
+    }
+    /* Hovering the scrollbar itself lights up the thumb */
+    #auto-prompt::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg,
+        rgba(200,40,255,.80) 0%,
+        rgba(150,0,220,.65) 100%);
+      border-color: rgba(255,255,255,.18);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.25) inset,
+        0 0 10px rgba(180,0,255,.5);
+    }
+    #auto-prompt::-webkit-scrollbar-thumb:active {
+      background: linear-gradient(180deg,
+        rgba(220,60,255,.9) 0%,
+        rgba(170,10,240,.75) 100%);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.3) inset,
+        0 0 14px rgba(180,0,255,.65);
+    }
+    #auto-prompt::-webkit-scrollbar-corner { background: transparent; }
+    /* Firefox fallback — only set scrollbar-color (don't set scrollbar-width
+       because Chromium now respects it too and it would override our 6px). */
+    @supports (-moz-appearance: none) {
+      #auto-prompt {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(180,0,255,.45) transparent;
+      }
+    }
+
     .scene-num-input {
       width: 70px;
-      padding: 14px 12px;
-      background: rgba(255,255,255,.04);
-      border: 1px solid rgba(255,255,255,.1);
-      border-radius: 12px;
+      padding: 12px 12px;
+      background: linear-gradient(180deg,
+        rgba(255,255,255,.05) 0%,
+        rgba(255,255,255,.02) 100%);
+      border: 1px solid rgba(255,255,255,.10);
+      border-top-color: rgba(255,255,255,.20);
+      border-radius: 11px;
       color: var(--white);
       font-size: 13px;
       text-align: center;
       outline: none;
-      transition: border-color .3s ease;
+      backdrop-filter: blur(16px);
+      transition: all .25s ease;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.10) inset,
+        0 2px 6px rgba(0,0,0,.2);
     }
     .scene-num-input:focus {
-      border-color: rgba(180,0,255,.4);
+      border-color: rgba(180,0,255,.5);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.10) inset,
+        0 0 14px rgba(180,0,255,.2);
     }
 
     #auto-generate {
-      padding: 14px 24px;
-      background: var(--accent);
-      border: none;
+      padding: 13px 26px;
+      background: linear-gradient(180deg,
+        rgba(200,30,255,.85) 0%,
+        rgba(150,0,220,.7) 100%);
+      border: 1px solid rgba(255,255,255,.18);
+      border-top-color: rgba(255,255,255,.35);
       border-radius: 12px;
       color: #fff;
       font-size: 12px; font-weight: 700; letter-spacing: 1.5px;
       cursor: pointer;
-      transition: all .3s ease;
+      transition: all .25s ease;
       white-space: nowrap;
+      backdrop-filter: blur(16px);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.25) inset,
+        0 -1px 0 rgba(0,0,0,.2) inset,
+        0 4px 16px rgba(180,0,255,.25);
     }
     #auto-generate:hover {
-      box-shadow: 0 0 20px rgba(180,0,255,.4);
+      background: linear-gradient(180deg,
+        rgba(220,50,255,.95) 0%,
+        rgba(170,10,240,.8) 100%);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.3) inset,
+        0 0 24px rgba(180,0,255,.55),
+        0 6px 20px rgba(0,0,0,.35);
       transform: translateY(-1px);
     }
+    #auto-generate:disabled { opacity: .55; cursor: not-allowed; transform: none; }
 
     /* ─── TIMELINE CONTAINER ────────────────────── */
     #timeline-wrap {
@@ -266,37 +507,46 @@
       background: rgba(180,0,255,.25); border-radius: 4px;
     }
 
-    /* ─── SCENE CARD ────────────────────────────── */
+    /* ─── SCENE NODE (canvas-positioned, draggable) ── */
     .scene-card {
-      flex-shrink: 0;
+      position: absolute;                    /* placed via inline left/top */
       width: 300px;
       display: flex;
       flex-direction: column;
-      background: rgba(255,255,255,.03);
-      border: 1px solid rgba(255,255,255,.07);
-      border-radius: 16px;
+      background: rgba(20,20,30,.78);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
       backdrop-filter: blur(20px);
       overflow: hidden;
-      transition: all .4s cubic-bezier(.34,1.56,.64,1);
-      position: relative;
-      animation: card-in .5s cubic-bezier(.34,1.56,.64,1) both;
+      transition: border-color .25s ease, box-shadow .25s ease;
+      animation: card-in .35s cubic-bezier(.34,1.56,.64,1) both;
     }
     .scene-card:hover {
-      border-color: rgba(180,0,255,.3);
-      box-shadow: 0 0 30px rgba(180,0,255,.08);
-      transform: translateY(-4px);
+      border-color: rgba(180,0,255,.35);
+      box-shadow: 0 4px 30px rgba(180,0,255,.12);
     }
+    .scene-card.is-dragging {
+      cursor: grabbing;
+      box-shadow: 0 12px 50px rgba(180,0,255,.25);
+      border-color: rgba(180,0,255,.55);
+      z-index: 100;
+    }
+    .scene-card.is-error { border-color: rgba(255,60,60,.4); }
+
     @keyframes card-in {
-      0% { opacity: 0; transform: translateY(20px) scale(.95); }
-      100% { opacity: 1; transform: translateY(0) scale(1); }
+      0%   { opacity: 0; transform: scale(.94); }
+      100% { opacity: 1; transform: scale(1); }
     }
 
-    /* scene header */
+    /* scene header — drag handle */
     .scene-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 12px 16px;
+      padding: 10px 14px;
       border-bottom: 1px solid rgba(255,255,255,.05);
+      cursor: grab;
+      user-select: none;
     }
+    .scene-header:active { cursor: grabbing; }
     .scene-number {
       font-size: 10px; font-weight: 700; letter-spacing: 3px;
       color: var(--accent);
@@ -306,20 +556,30 @@
       color: rgba(255,255,255,.3);
     }
     .scene-remove {
-      width: 24px; height: 24px;
-      border: 1px solid rgba(255,255,255,.1);
-      border-radius: 6px;
-      background: rgba(255,255,255,.03);
-      color: rgba(255,255,255,.3);
+      width: 26px; height: 26px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-top-color: rgba(255,255,255,.24);
+      border-radius: 7px;
+      background: linear-gradient(180deg,
+        rgba(255,255,255,.06) 0%,
+        rgba(255,255,255,.01) 100%);
+      backdrop-filter: blur(14px);
+      color: rgba(255,255,255,.4);
       font-size: 14px;
       cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: all .2s ease;
+      box-shadow: 0 1px 0 rgba(255,255,255,.10) inset;
     }
     .scene-remove:hover {
-      background: rgba(255,60,60,.15);
-      border-color: rgba(255,60,60,.3);
-      color: #ff5c5c;
+      background: linear-gradient(180deg,
+        rgba(255,60,60,.25) 0%,
+        rgba(255,60,60,.08) 100%);
+      border-color: rgba(255,60,60,.45);
+      color: #ff8080;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.18) inset,
+        0 0 12px rgba(255,60,60,.25);
     }
 
     /* image preview area */
@@ -361,6 +621,113 @@
       content: '';
       position: absolute; inset: 0;
       background: linear-gradient(to bottom, transparent 60%, rgba(6,6,10,.7));
+    }
+
+    /* error state */
+    .scene-preview.is-error {
+      background: rgba(255,60,60,.06);
+      border: 1px dashed rgba(255,60,60,.3);
+    }
+    .scene-preview.is-error .placeholder-icon { color: rgba(255,80,80,.6); }
+    .scene-preview.is-error .placeholder-text { color: rgba(255,80,80,.5); }
+
+    /* REGENERATE hover overlay — inline confirm to prevent accidental clicks */
+    .scene-preview .regen-overlay {
+      position: absolute; inset: 0;
+      background: rgba(6,6,10,.55);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0;
+      transition: opacity .2s ease;
+      z-index: 4;
+      pointer-events: none;       /* overlay bg itself passes clicks through */
+    }
+    /* Show on hover. */
+    .scene-preview:hover .regen-overlay {
+      opacity: 1;
+      pointer-events: auto;        /* only when visible do buttons capture */
+    }
+    /* Momentarily suppressed after CANCEL so a fat-finger hover doesn't
+       immediately bring the confirm card back. */
+    .scene-preview.regen-dismissed:hover .regen-overlay {
+      opacity: 0;
+      pointer-events: none;
+    }
+    /* The inner card IS clickable — this is where the confirm/cancel live */
+    .regen-card {
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: linear-gradient(180deg,
+        rgba(20,20,30,.78) 0%,
+        rgba(10,10,15,.85) 100%);
+      border: 1px solid rgba(255,255,255,.10);
+      border-top-color: rgba(255,255,255,.22);
+      backdrop-filter: blur(22px) saturate(160%);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.12) inset,
+        0 8px 28px rgba(0,0,0,.5);
+    }
+    .regen-title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 11px; letter-spacing: 2.5px;
+      color: #fff; font-weight: 700;
+    }
+    .regen-title .regen-icon {
+      font-size: 16px;
+      color: var(--accent);
+      text-shadow: 0 0 8px rgba(180,0,255,.6);
+    }
+    .regen-sub {
+      font-size: 9px; letter-spacing: 1.5px;
+      color: rgba(255,200,80,.75);
+      text-align: center;
+    }
+    .regen-actions {
+      display: flex; gap: 6px;
+      margin-top: 2px;
+    }
+    .regen-btn {
+      padding: 7px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-top-color: rgba(255,255,255,.22);
+      font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+      cursor: pointer;
+      backdrop-filter: blur(14px);
+      transition: all .18s ease;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.10) inset,
+        0 2px 8px rgba(0,0,0,.3);
+    }
+    .regen-confirm {
+      background: linear-gradient(180deg,
+        rgba(200,30,255,.85) 0%,
+        rgba(150,0,220,.7) 100%);
+      color: #fff;
+      border-color: rgba(255,255,255,.22);
+    }
+    .regen-confirm:hover {
+      background: linear-gradient(180deg,
+        rgba(220,50,255,.95) 0%,
+        rgba(170,10,240,.8) 100%);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.3) inset,
+        0 0 18px rgba(180,0,255,.55);
+      transform: translateY(-1px);
+    }
+    .regen-cancel {
+      background: linear-gradient(180deg,
+        rgba(255,255,255,.07) 0%,
+        rgba(255,255,255,.02) 100%);
+      color: rgba(255,255,255,.75);
+    }
+    .regen-cancel:hover {
+      background: linear-gradient(180deg,
+        rgba(255,255,255,.12) 0%,
+        rgba(255,255,255,.04) 100%);
+      color: #fff;
+      border-color: rgba(255,255,255,.22);
     }
 
     /* scene body */
@@ -480,16 +847,20 @@
       color: rgba(255,255,255,.2);
     }
 
-    /* ─── BOTTOM TOOLBAR ────────────────────────── */
+    /* ─── BOTTOM TOOLBAR (floating overlay) ──────── */
     #bottom-bar {
+      position: fixed;
+      bottom: 24px; left: 32px; right: 32px;
+      z-index: 50;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 12px 32px 20px;
-      flex-shrink: 0;
-      border-top: 1px solid rgba(255,255,255,.04);
-      background: rgba(6,6,10,.5);
-      backdrop-filter: blur(12px);
+      padding: 10px 16px;
+      border: 1px solid rgba(180,0,255,.12);
+      border-radius: 14px;
+      background: rgba(20,20,30,.55);
+      backdrop-filter: blur(20px);
+      box-shadow: 0 10px 30px rgba(0,0,0,.4);
     }
 
     .bottom-left {
@@ -497,23 +868,36 @@
     }
 
     .aspect-chip {
-      padding: 6px 14px;
-      border: 1px solid rgba(255,255,255,.08);
-      border-radius: 8px;
-      background: rgba(255,255,255,.03);
+      padding: 7px 16px;
+      border: 1px solid rgba(255,255,255,.10);
+      border-top-color: rgba(255,255,255,.20);
+      border-radius: 9px;
+      background: linear-gradient(180deg,
+        rgba(255,255,255,.06) 0%,
+        rgba(255,255,255,.02) 100%);
+      backdrop-filter: blur(16px) saturate(150%);
       font-size: 10px; letter-spacing: 2px;
-      color: rgba(255,255,255,.35);
+      color: rgba(255,255,255,.4);
       cursor: pointer;
-      transition: all .3s ease;
+      transition: all .25s ease;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.10) inset,
+        0 2px 6px rgba(0,0,0,.2);
     }
     .aspect-chip.active {
-      border-color: rgba(180,0,255,.4);
-      color: var(--accent);
-      background: rgba(180,0,255,.08);
+      border-color: rgba(180,0,255,.45);
+      color: #fff;
+      background: linear-gradient(180deg,
+        rgba(180,0,255,.35) 0%,
+        rgba(150,0,220,.18) 100%);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.22) inset,
+        0 0 14px rgba(180,0,255,.35);
     }
     .aspect-chip:hover:not(.active) {
-      border-color: rgba(255,255,255,.15);
-      color: rgba(255,255,255,.5);
+      border-color: rgba(255,255,255,.18);
+      color: rgba(255,255,255,.65);
+      transform: translateY(-1px);
     }
 
     .quality-label {
@@ -528,17 +912,31 @@
     }
 
     .export-btn {
-      padding: 10px 24px;
-      background: var(--accent);
-      border: none;
-      border-radius: 10px;
+      padding: 11px 26px;
+      background: linear-gradient(180deg,
+        rgba(200,30,255,.85) 0%,
+        rgba(150,0,220,.7) 100%);
+      border: 1px solid rgba(255,255,255,.18);
+      border-top-color: rgba(255,255,255,.35);
+      backdrop-filter: blur(16px);
+      border-radius: 11px;
       color: #fff;
       font-size: 12px; font-weight: 700; letter-spacing: 1.5px;
       cursor: pointer;
-      transition: all .3s ease;
+      transition: all .25s ease;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.25) inset,
+        0 -1px 0 rgba(0,0,0,.2) inset,
+        0 4px 16px rgba(180,0,255,.25);
     }
     .export-btn:hover {
-      box-shadow: 0 0 20px rgba(180,0,255,.4);
+      background: linear-gradient(180deg,
+        rgba(220,50,255,.95) 0%,
+        rgba(170,10,240,.8) 100%);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.3) inset,
+        0 0 24px rgba(180,0,255,.55),
+        0 6px 20px rgba(0,0,0,.35);
       transform: translateY(-1px);
     }
 
@@ -663,6 +1061,7 @@
       <div class="scene-count">SCENES: <span id="scene-count-num">3</span> / 8</div>
     </div>
     <div class="toolbar-right">
+      <button class="tb-btn manual-only" id="btn-add-scene">+ ADD SCENE</button>
       <button class="tb-btn" id="btn-clear">CLEAR ALL</button>
       <button class="tb-btn primary" id="btn-generate-all">GENERATE ALL ⬡</button>
     </div>
@@ -670,8 +1069,8 @@
 
   <!-- auto-mode prompt bar -->
   <div id="auto-bar">
-    <input id="auto-prompt" type="text"
-      placeholder="Describe your full story... AI will split it into scenes automatically">
+    <textarea id="auto-prompt" rows="1"
+      placeholder="Describe your full story... AI will split it into scenes automatically (支持中文、可粘贴多行剧本)"></textarea>
     <button id="auto-upload" class="tb-btn" title="Upload .txt or .md script">📎 UPLOAD</button>
     <input id="auto-upload-file" type="file" accept=".txt,.md,text/plain,text/markdown" style="display:none">
     <input class="scene-num-input" type="number" id="auto-scene-num" value="4" min="2" max="8" title="Number of scenes">
@@ -679,9 +1078,20 @@
     <span id="auto-upload-hint" style="font-size:11px;color:rgba(255,255,255,.45);margin-left:4px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
   </div>
 
-  <!-- timeline -->
-  <div id="timeline-wrap">
-    <div id="timeline"></div>
+  <!-- infinite canvas -->
+  <div id="canvas-viewport">
+    <div id="canvas-stage">
+      <svg id="wires-svg"></svg>
+      <!-- scene nodes injected here by renderCanvas() -->
+    </div>
+  </div>
+
+  <!-- zoom indicator -->
+  <div id="zoom-pill">
+    <button id="zoom-out" title="Zoom out">−</button>
+    <span id="zoom-level">100%</span>
+    <button id="zoom-in" title="Zoom in">+</button>
+    <button id="zoom-fit" title="Fit to view" style="margin-left:6px">⛶</button>
   </div>
 
   <!-- bottom bar -->
@@ -701,6 +1111,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="/js/api.js"></script>
 <script>
 /* ═══════════════════════════════════════════════
@@ -711,19 +1122,161 @@ API.init().then(() => loadScenesFromAPI());
 async function loadScenesFromAPI() {
   try {
     const apiScenes = await API.getScenes();
-    if (apiScenes.length > 0) {
-      scenes = apiScenes.map(s => ({
-        _id: s.id,
-        prompt: s.prompt,
-        shot: s.shot_type,
-        camera: s.camera_move,
-        duration: s.duration,
-        generated: s.status === 'done',
-        image_path: s.image_path,
-      }));
-      renderTimeline();
+    // Defensive: backend may return an error object when project is
+    // deleted or the user's session expired. Treat as "no scenes".
+    if (Array.isArray(apiScenes) && apiScenes.length > 0) {
+      scenes = apiScenes.map((s, i) => apiToLocal(s, i));
     }
-  } catch (e) { /* use default scenes */ }
+    autoLayout();
+    renderCanvas();
+    // Defer one frame so the viewport has measured itself
+    requestAnimationFrame(() => fitToScenes());
+    // If anything is actively generating, resume polling.
+    // 'pending' is treated as idle (ready to generate), NOT busy.
+    if (scenes.some(s => s.status === 'generating')) {
+      startPolling();
+    }
+    // If the user was sent here from the Scripts page, auto-switch to
+    // AUTO mode and pre-fill the prompt with the generated script.
+    consumePendingScriptHandoff();
+  } catch (e) {
+    autoLayout();
+    renderCanvas();
+    consumePendingScriptHandoff();
+  }
+}
+
+/* When the user clicks SEND TO STORYBOARD on the scripts page, that
+   page stashes the script in sessionStorage and navigates here with
+   `?fromScript=1`. On arrival we:
+     1. Switch to AUTO mode
+     2. Paste the script into the auto-prompt textarea
+     3. Clear the stashed value so a refresh doesn't re-fill
+*/
+function consumePendingScriptHandoff() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('fromScript') !== '1') return;
+
+  let script = '';
+  try { script = sessionStorage.getItem('vshort_pending_script') || ''; } catch (_) {}
+  if (!script) return;
+
+  // Switch to AUTO mode
+  const autoModeBtn = document.querySelector('.mode-btn[data-mode="auto"]');
+  if (autoModeBtn) autoModeBtn.click();
+
+  // Fill the prompt
+  const prompt = document.getElementById('auto-prompt');
+  if (prompt) {
+    prompt.value = script.length > 2000 ? script.slice(0, 2000) : script;
+    if (typeof window.__autoPromptGrow === 'function') window.__autoPromptGrow();
+    flashToast('Script loaded — click GENERATE to build the storyboard', false);
+  }
+
+  // Clear so a refresh doesn't re-fill
+  try { sessionStorage.removeItem('vshort_pending_script'); } catch (_) {}
+
+  // Tidy the URL: drop the `?fromScript=1` without reloading
+  const clean = location.pathname + location.hash;
+  history.replaceState(null, '', clean);
+}
+
+// Convert one backend scene row → local scene model
+function apiToLocal(s, i = 0) {
+  return {
+    _id:        s.id,
+    prompt:     s.prompt,
+    shot:       s.shot_type,
+    camera:     s.camera_move,
+    duration:   s.duration,
+    status:     s.status,
+    generated:  s.status === 'done',
+    image_path: s.image_path,
+    // x/y are managed locally — only bumped when image_path changes
+    x:          undefined,
+    y:          undefined,
+    _imgKey:    s.image_path || '',   // when this changes, force <img> reload
+  };
+}
+
+/* ═══════════════════════════════════════════════
+   POLLING — diff-based, never destroys DOM,
+   so generated images stop flickering.
+═══════════════════════════════════════════════ */
+let _pollTimer = null;
+function stopPolling() {
+  if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null; }
+}
+function startPolling({ intervalMs = 2500, maxAttempts = 80 } = {}) {
+  stopPolling();
+  let attempts = 0;
+  const tick = async () => {
+    attempts++;
+    try {
+      const apiScenes = await API.getScenes();
+
+      // Defensive: if the backend returned an error object (project
+      // deleted, auth expired, etc.) `apiScenes` will be something like
+      // `{error: "..."}`. Bailing cleanly beats spamming the console.
+      if (!Array.isArray(apiScenes)) {
+        console.warn('[poll] stopping — non-array response:', apiScenes);
+        _pollTimer = null;
+        return;
+      }
+
+      let stillBusy = false;
+
+      // Merge by id, preserving local x/y. We bump _imgKey when EITHER:
+      //   - image_path changed (new filename), OR
+      //   - status just transitioned from generating/pending → done.
+      // The second case is critical for regenerate: backend overwrites the
+      // same file on disk, so image_path stays identical but the image bytes
+      // changed — we need the browser to re-fetch.
+      const byId = new Map(scenes.map(s => [s._id, s]));
+      scenes = apiScenes.map(s => {
+        // 'pending' = created but not yet started = idle. Only 'generating'
+        // means the backend is actively painting the image.
+        if (s.status === 'generating') stillBusy = true;
+        const prev = byId.get(s.id);
+        const wasBusy = prev && prev.status === 'generating';
+        const justFinished = wasBusy && s.status === 'done';
+        const pathChanged  = prev && s.image_path !== prev.image_path;
+        let newImgKey;
+        if (!s.image_path) {
+          newImgKey = '';
+        } else if (justFinished || pathChanged || !prev || !prev._imgKey) {
+          newImgKey = `${s.image_path}?t=${Date.now()}`;
+        } else {
+          newImgKey = prev._imgKey;
+        }
+        return {
+          _id:        s.id,
+          prompt:     s.prompt,
+          shot:       s.shot_type,
+          camera:     s.camera_move,
+          duration:   s.duration,
+          status:     s.status,
+          generated:  s.status === 'done',
+          image_path: s.image_path,
+          x:          prev?.x,
+          y:          prev?.y,
+          _imgKey:    newImgKey,
+        };
+      });
+      autoLayout();        // assigns x/y to any new scene that lacks them
+      renderCanvas();      // diff-based, won't tear down unchanged nodes
+
+      if (stillBusy && attempts < maxAttempts) {
+        _pollTimer = setTimeout(tick, intervalMs);
+      } else {
+        _pollTimer = null;
+      }
+    } catch (e) {
+      console.warn('[poll] failed:', e);
+      if (attempts < maxAttempts) _pollTimer = setTimeout(tick, intervalMs);
+    }
+  };
+  _pollTimer = setTimeout(tick, intervalMs);
 }
 
 /* ═══════════════════════════════════════════════
@@ -760,193 +1313,623 @@ let scenes = [
   { prompt: '', shot: 'Close-Up', camera: 'Static', duration: '8-12s', generated: false },
 ];
 
-let currentMode = 'manual';
+let currentMode   = 'manual';
+let currentAspect = '16:9';   // matches the chip that starts .active in the HTML
 
 /* ═══════════════════════════════════════════════
-   RENDER TIMELINE
+   AUTO-LAYOUT — assign x/y to scenes without one
 ═══════════════════════════════════════════════ */
-function renderTimeline() {
-  const tl = document.getElementById('timeline');
-  tl.innerHTML = '';
+const NODE_W   = 300;
+const NODE_H   = 360;     // approx full card height
+const GAP_X    = 80;
+const GAP_Y    = 40;
+const COLS     = 4;       // wrap to a new row after 4 nodes
+const ORIGIN_X = 200;     // initial canvas offset
+const ORIGIN_Y = 200;
 
-  scenes.forEach((scene, i) => {
-    // scene card
-    const card = document.createElement('div');
-    card.className = 'scene-card';
-    card.style.animationDelay = `${i * 0.08}s`;
-    card.innerHTML = `
-      <div class="scene-generating">
-        <div class="scene-spinner"></div>
-        <div class="scene-gen-text">GENERATING</div>
-      </div>
-      <div class="scene-header">
-        <span class="scene-number">SCENE ${String(i + 1).padStart(2, '0')}</span>
-        <span class="scene-duration">${scene.duration}</span>
-        <button class="scene-remove" data-i="${i}" title="Remove scene">&times;</button>
-      </div>
-      <div class="scene-preview" data-i="${i}">
-        <div class="gen-image ${scene.generated ? 'show' : ''}"
-          style="background:${PREVIEW_GRADIENTS[i % PREVIEW_GRADIENTS.length]}"></div>
-        ${!scene.generated ? `
-        <span class="placeholder-icon">⬡</span>
-        <span class="placeholder-text">CLICK TO GENERATE</span>
-        ` : `
-        <span class="placeholder-icon" style="color:rgba(180,0,255,.5);font-size:20px;position:relative;z-index:2">✓</span>
-        <span class="placeholder-text" style="color:rgba(180,0,255,.4);position:relative;z-index:2">GENERATED</span>
-        `}
-      </div>
-      <div class="scene-body">
-        <textarea class="scene-prompt" data-i="${i}"
-          placeholder="Describe this scene... framing, mood, action..."
-          rows="3">${scene.prompt}</textarea>
-        <div class="shot-controls">
-          <select class="shot-select" data-field="shot" data-i="${i}">
-            ${SHOT_TYPES.map(s => `<option ${s === scene.shot ? 'selected' : ''}>${s}</option>`).join('')}
-          </select>
-          <select class="shot-select" data-field="camera" data-i="${i}">
-            ${CAMERA_MOVES.map(c => `<option ${c === scene.camera ? 'selected' : ''}>${c}</option>`).join('')}
-          </select>
-        </div>
-      </div>
-    `;
-    tl.appendChild(card);
-
-    // connector arrow (not after last scene)
-    if (i < scenes.length - 1) {
-      const conn = document.createElement('div');
-      conn.className = 'connector';
-      conn.innerHTML = `<span class="trans-label">${TRANSITIONS[i % TRANSITIONS.length]}</span>`;
-      tl.appendChild(conn);
-    }
+function autoLayout() {
+  scenes.forEach((s, i) => {
+    if (typeof s.x === 'number' && typeof s.y === 'number') return;
+    const col = i % COLS;
+    const row = Math.floor(i / COLS);
+    s.x = ORIGIN_X + col * (NODE_W + GAP_X);
+    s.y = ORIGIN_Y + row * (NODE_H + GAP_Y);
   });
-
-  // add-scene card (if < 8)
-  if (scenes.length < 8) {
-    const add = document.createElement('div');
-    if (scenes.length > 0) {
-      const conn = document.createElement('div');
-      conn.className = 'connector';
-      tl.appendChild(conn);
-    }
-    add.className = 'add-scene-card';
-    add.innerHTML = `
-      <div class="add-icon">+</div>
-      <span class="add-label">ADD SCENE</span>
-    `;
-    add.addEventListener('click', addScene);
-    tl.appendChild(add);
-  }
-
-  // update count
-  document.getElementById('scene-count-num').textContent = scenes.length;
-
-  // bind events
-  bindSceneEvents();
 }
 
-function bindSceneEvents() {
-  // remove buttons
-  document.querySelectorAll('.scene-remove').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const i = +btn.dataset.i;
-      if (scenes.length <= 1) return;
-      scenes.splice(i, 1);
-      renderTimeline();
-    });
+/* ═══════════════════════════════════════════════
+   RENDER CANVAS — diff-based, never tears down nodes
+═══════════════════════════════════════════════ */
+function renderCanvas() {
+  const stage = document.getElementById('canvas-stage');
+  const svg   = document.getElementById('wires-svg');
+
+  // Index existing card DOM by scene id (or numeric index for new scenes)
+  const existing = new Map();
+  stage.querySelectorAll('.scene-card').forEach(el => {
+    existing.set(el.dataset.sid, el);
   });
 
-  // prompt editing
-  document.querySelectorAll('.scene-prompt').forEach(ta => {
-    ta.addEventListener('input', () => {
-      scenes[+ta.dataset.i].prompt = ta.value;
-    });
+  const seen = new Set();
+  scenes.forEach((scene, i) => {
+    const sid = scene._id || `tmp-${i}`;
+    seen.add(sid);
+    let card = existing.get(sid);
+    if (!card) {
+      card = createSceneCard(scene, i, sid);
+      stage.appendChild(card);
+    }
+    updateSceneCard(card, scene, i);
   });
 
-  // shot / camera selects
-  document.querySelectorAll('.shot-select').forEach(sel => {
+  // Remove cards whose scene no longer exists
+  existing.forEach((el, sid) => {
+    if (!seen.has(sid)) el.remove();
+  });
+
+  // Draw connection wires between consecutive scenes
+  drawWires(svg);
+
+  // Update toolbar count
+  const cnt = document.getElementById('scene-count-num');
+  if (cnt) cnt.textContent = scenes.length;
+}
+
+function createSceneCard(scene, i, sid) {
+  const card = document.createElement('div');
+  card.className = 'scene-card';
+  card.dataset.sid = sid;
+  card.innerHTML = `
+    <div class="scene-generating"><div class="scene-spinner"></div><div class="scene-gen-text">GENERATING</div></div>
+    <div class="scene-header" data-drag="1">
+      <span class="scene-number"></span>
+      <span class="scene-duration"></span>
+      <button class="scene-remove" title="Remove scene">&times;</button>
+    </div>
+    <div class="scene-preview">
+      <div class="gen-image" style="background-color:#1a0033"></div>
+      <span class="placeholder-icon">⬡</span>
+      <span class="placeholder-text">CLICK TO GENERATE</span>
+      <div class="regen-overlay">
+        <div class="regen-card">
+          <div class="regen-title"><span class="regen-icon">↻</span> REGENERATE?</div>
+          <div class="regen-sub">CURRENT IMAGE WILL BE REPLACED</div>
+          <div class="regen-actions">
+            <button class="regen-btn regen-confirm">YES, REGENERATE</button>
+            <button class="regen-btn regen-cancel">CANCEL</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="scene-body">
+      <textarea class="scene-prompt"
+        placeholder="Describe this scene... framing, mood, action..."
+        rows="3"></textarea>
+      <div class="shot-controls">
+        <select class="shot-select" data-field="shot">
+          ${SHOT_TYPES.map(s => `<option>${s}</option>`).join('')}
+        </select>
+        <select class="shot-select" data-field="camera">
+          ${CAMERA_MOVES.map(c => `<option>${c}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+  `;
+  bindCardEvents(card);
+  return card;
+}
+
+// Update card DOM in-place — only touch what changed.
+function updateSceneCard(card, scene, i) {
+  // Position (transform — no layout reflow on existing cards)
+  card.style.left = scene.x + 'px';
+  card.style.top  = scene.y + 'px';
+
+  // Header text
+  card.querySelector('.scene-number').textContent   = `SCENE ${String(i + 1).padStart(2, '0')}`;
+  card.querySelector('.scene-duration').textContent = scene.duration || '';
+
+  // Generating spinner — only for ACTIVELY generating scenes.
+  // 'pending' means "ready to generate, click me" — no spinner.
+  const spinner = card.querySelector('.scene-generating');
+  spinner.classList.toggle('on', scene.status === 'generating');
+
+  // Preview state
+  const preview = card.querySelector('.scene-preview');
+  const img     = card.querySelector('.gen-image');
+  const phIcon  = card.querySelector('.placeholder-icon');
+  const phText  = card.querySelector('.placeholder-text');
+  const regen   = card.querySelector('.regen-overlay');
+
+  preview.classList.toggle('is-error', scene.status === 'error');
+  card.classList.toggle('is-error',    scene.status === 'error');
+
+  if (scene.image_path) {
+    // Real image — only re-set background-image when the imgKey changed
+    const wantUrl = `url('${scene._imgKey || scene.image_path}')`;
+    if (img.dataset.k !== scene._imgKey) {
+      img.style.backgroundImage = wantUrl;
+      img.dataset.k = scene._imgKey;
+      img.classList.add('show');
+    }
+    phIcon.style.display = 'none';
+    phText.style.display = 'none';
+    regen.style.display  = '';
+  } else if (scene.status === 'error') {
+    img.classList.remove('show');
+    img.style.backgroundImage = 'none';
+    img.dataset.k = '';
+    phIcon.style.display = '';
+    phText.style.display = '';
+    phIcon.textContent = '✕';
+    phIcon.style.color = '#ff7878';
+    phText.textContent = 'FAILED — CLICK TO RETRY';
+    phText.style.color = '#ff8a8a';
+    regen.style.display = 'none';
+  } else {
+    img.classList.remove('show');
+    img.style.backgroundImage = 'none';
+    img.dataset.k = '';
+    phIcon.style.display = '';
+    phText.style.display = '';
+    phIcon.textContent = '⬡';
+    phIcon.style.color = '';
+    phText.textContent = scene.status === 'generating' ? 'GENERATING…' : 'CLICK TO GENERATE';
+    phText.style.color = '';
+    regen.style.display = 'none';
+  }
+
+  // Inputs — only touch if user isn't currently focused on them
+  const ta = card.querySelector('.scene-prompt');
+  if (document.activeElement !== ta && ta.value !== (scene.prompt || '')) {
+    ta.value = scene.prompt || '';
+  }
+  card.querySelectorAll('.shot-select').forEach(sel => {
+    if (document.activeElement === sel) return;
+    const want = sel.dataset.field === 'shot' ? scene.shot : scene.camera;
+    if (sel.value !== want) sel.value = want;
+  });
+}
+
+// SVG wire from scene i → scene i+1 (curved bezier with transition label)
+function drawWires(svg) {
+  // Cards are positioned in stage coordinates; wires sit at offset (-10000,-10000)
+  // Use page-coord math: anchor at scene's right-edge, target at next scene's left-edge.
+  svg.innerHTML = '';
+  if (scenes.length < 2) return;
+  const SVG_OFFSET = 10000;
+  for (let i = 0; i < scenes.length - 1; i++) {
+    const a = scenes[i], b = scenes[i + 1];
+    if (a.x === undefined || b.x === undefined) continue;
+    // Right edge of A's preview row (~y center of card)
+    const ax = a.x + NODE_W + SVG_OFFSET;
+    const ay = a.y + 100 + SVG_OFFSET;
+    const bx = b.x + SVG_OFFSET;
+    const by = b.y + 100 + SVG_OFFSET;
+    const midX = (ax + bx) / 2;
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M ${ax} ${ay} C ${midX} ${ay}, ${midX} ${by}, ${bx} ${by}`);
+    svg.appendChild(path);
+
+    const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    label.setAttribute('x', midX);
+    label.setAttribute('y', (ay + by) / 2 - 6);
+    label.setAttribute('text-anchor', 'middle');
+    label.classList.add('wire-label');
+    label.textContent = TRANSITIONS[i % TRANSITIONS.length];
+    svg.appendChild(label);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   PER-CARD EVENT BINDING (one-time, on creation)
+═══════════════════════════════════════════════ */
+function bindCardEvents(card) {
+  const sid = card.dataset.sid;
+
+  // helper: locate this card's scene index in current array
+  const findIdx = () => scenes.findIndex(s =>
+    (s._id ? s._id : `tmp-${scenes.indexOf(s)}`) === sid
+  );
+
+  // Remove
+  card.querySelector('.scene-remove').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const i = findIdx();
+    if (i < 0 || scenes.length <= 1) return;
+    if (scenes[i]._id) {
+      API.deleteScene(scenes[i]._id).catch(() => {});
+    }
+    scenes.splice(i, 1);
+    renderCanvas();
+    drawWires(document.getElementById('wires-svg'));
+  });
+
+  // Prompt textarea (debounce-save)
+  let pt;
+  const ta = card.querySelector('.scene-prompt');
+  ta.addEventListener('input', () => {
+    const i = findIdx();
+    if (i < 0) return;
+    scenes[i].prompt = ta.value;
+    if (!scenes[i]._id) return;
+    clearTimeout(pt);
+    pt = setTimeout(() => {
+      API.updateScene(scenes[i]._id, { prompt: ta.value }).catch(() => {});
+    }, 600);
+  });
+
+  // Shot / camera selects
+  card.querySelectorAll('.shot-select').forEach(sel => {
     sel.addEventListener('change', () => {
-      scenes[+sel.dataset.i][sel.dataset.field] = sel.value;
+      const i = findIdx();
+      if (i < 0) return;
+      const field = sel.dataset.field;
+      scenes[i][field] = sel.value;
+      if (!scenes[i]._id) return;
+      const apiField = field === 'shot' ? 'shot_type' : 'camera_move';
+      API.updateScene(scenes[i]._id, { [apiField]: sel.value }).catch(() => {});
     });
   });
 
-  // preview click → generate single scene
-  document.querySelectorAll('.scene-preview').forEach(prev => {
-    prev.addEventListener('click', () => {
-      generateScene(+prev.dataset.i);
-    });
+  // Click on preview → first-time generate only.
+  // If an image already exists, users must explicitly confirm via the
+  // confirm button inside the hover overlay (prevents accidental regen
+  // wiping 20+ seconds of Doubao work).
+  const preview = card.querySelector('.scene-preview');
+  preview.addEventListener('click', (e) => {
+    // Ignore clicks coming from inside the confirm overlay — they're
+    // handled by the dedicated button handlers below.
+    if (e.target.closest('.regen-overlay')) return;
+    const i = findIdx();
+    if (i < 0) return;
+    const scene = scenes[i];
+    // Only trigger on fresh/failed scenes. Otherwise require explicit confirm.
+    if (!scene.image_path || scene.status === 'error') {
+      generateScene(i);
+    }
+  });
+
+  // Explicit regenerate — the big purple button inside the hover overlay
+  card.querySelector('.regen-confirm').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const i = findIdx();
+    if (i >= 0) generateScene(i);
+  });
+
+  // Explicit cancel — briefly suppresses the overlay so a fat-finger
+  // move doesn't immediately re-trigger the confirm card.
+  card.querySelector('.regen-cancel').addEventListener('click', (e) => {
+    e.stopPropagation();
+    preview.classList.add('regen-dismissed');
+    preview.style.pointerEvents = 'none';
+    setTimeout(() => {
+      preview.classList.remove('regen-dismissed');
+      preview.style.pointerEvents = '';
+    }, 900);
+  });
+
+  // Drag the node (mousedown on header)
+  const header = card.querySelector('.scene-header');
+  header.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('scene-remove')) return;
+    e.preventDefault();
+    e.stopPropagation();        // don't trigger canvas pan
+    const i = findIdx();
+    if (i < 0) return;
+    card.classList.add('is-dragging');
+    const startX = e.clientX, startY = e.clientY;
+    const sx = scenes[i].x, sy = scenes[i].y;
+    const z = canvasState.zoom;
+    const onMove = (ev) => {
+      scenes[i].x = sx + (ev.clientX - startX) / z;
+      scenes[i].y = sy + (ev.clientY - startY) / z;
+      card.style.left = scenes[i].x + 'px';
+      card.style.top  = scenes[i].y + 'px';
+      drawWires(document.getElementById('wires-svg'));
+    };
+    const onUp = () => {
+      card.classList.remove('is-dragging');
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   });
 }
 
 function addScene() {
   if (scenes.length >= 8) return;
-  const last = scenes[scenes.length - 1];
-  const endSec = parseInt(last.duration.split('-')[1]) || (scenes.length * 4);
-  scenes.push({
+  const last = scenes[scenes.length - 1] || {};
+  const endSec = parseInt((last.duration || '0-4s').split('-')[1]) || (scenes.length * 4);
+  // Place new node next to the last
+  const newScene = {
     prompt: '',
-    shot: SHOT_TYPES[scenes.length % SHOT_TYPES.length],
+    shot:   SHOT_TYPES[scenes.length % SHOT_TYPES.length],
     camera: CAMERA_MOVES[scenes.length % CAMERA_MOVES.length],
     duration: `${endSec}-${endSec + 4}s`,
-    generated: false
-  });
-  renderTimeline();
-  // scroll to end
-  const tl = document.getElementById('timeline');
-  setTimeout(() => tl.scrollLeft = tl.scrollWidth, 100);
+    generated: false,
+    status:    'pending',
+    x:         (last.x || ORIGIN_X) + NODE_W + GAP_X,
+    y:         last.y || ORIGIN_Y,
+  };
+  scenes.push(newScene);
+  renderCanvas();
 }
 
 /* ═══════════════════════════════════════════════
-   GENERATE SCENES
+   CANVAS PAN / ZOOM
 ═══════════════════════════════════════════════ */
-function generateScene(i) {
-  const card = document.querySelectorAll('.scene-card')[i];
-  if (!card) return;
-  const overlay = card.querySelector('.scene-generating');
-  overlay.classList.add('on');
+const canvasState = { x: 0, y: 0, zoom: 1 };
+const ZOOM_MIN = 0.25, ZOOM_MAX = 2;
 
-  setTimeout(() => {
-    scenes[i].generated = true;
-    overlay.classList.remove('on');
-    renderTimeline();
-  }, 1500 + Math.random() * 1000);
+function applyTransform() {
+  const stage = document.getElementById('canvas-stage');
+  stage.style.transform = `translate(${canvasState.x}px, ${canvasState.y}px) scale(${canvasState.zoom})`;
+  const lvl = document.getElementById('zoom-level');
+  if (lvl) lvl.textContent = Math.round(canvasState.zoom * 100) + '%';
+  // Move dot-grid in sync so it feels anchored to the canvas
+  const vp = document.getElementById('canvas-viewport');
+  const step = 24 * canvasState.zoom;
+  vp.style.backgroundSize     = `${step}px ${step}px`;
+  vp.style.backgroundPosition = `${canvasState.x}px ${canvasState.y}px`;
 }
 
-function generateAll() {
-  scenes.forEach((s, i) => {
-    setTimeout(() => generateScene(i), i * 600);
+function fitToScenes() {
+  if (!scenes.length) {
+    canvasState.x = 0; canvasState.y = 0; canvasState.zoom = 1;
+    applyTransform(); return;
+  }
+  const xs = scenes.map(s => s.x).filter(Number.isFinite);
+  const ys = scenes.map(s => s.y).filter(Number.isFinite);
+  const minX = Math.min(...xs), maxX = Math.max(...xs) + NODE_W;
+  const minY = Math.min(...ys), maxY = Math.max(...ys) + NODE_H;
+  const w = maxX - minX, h = maxY - minY;
+  const vp = document.getElementById('canvas-viewport');
+  const vw = vp.clientWidth - 80, vh = vp.clientHeight - 220;
+  const z = Math.max(ZOOM_MIN, Math.min(1, Math.min(vw / w, vh / h)));
+  canvasState.zoom = z;
+  // Center
+  canvasState.x = (vp.clientWidth  - w * z) / 2 - minX * z;
+  canvasState.y = (vp.clientHeight - h * z) / 2 - minY * z + 30;
+  applyTransform();
+}
+
+function bindCanvasInteractions() {
+  const vp = document.getElementById('canvas-viewport');
+
+  // Pan
+  vp.addEventListener('mousedown', (e) => {
+    if (e.target !== vp) return;     // only when clicking the bg
+    e.preventDefault();
+    vp.classList.add('panning');
+    const startX = e.clientX, startY = e.clientY;
+    const sx = canvasState.x, sy = canvasState.y;
+    const onMove = (ev) => {
+      canvasState.x = sx + (ev.clientX - startX);
+      canvasState.y = sy + (ev.clientY - startY);
+      applyTransform();
+    };
+    const onUp = () => {
+      vp.classList.remove('panning');
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
   });
+
+  // Zoom on wheel — keep cursor as fixed point
+  vp.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = vp.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    const delta = -e.deltaY * 0.0015;
+    const newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, canvasState.zoom * (1 + delta)));
+    const ratio = newZoom / canvasState.zoom;
+    canvasState.x = px - (px - canvasState.x) * ratio;
+    canvasState.y = py - (py - canvasState.y) * ratio;
+    canvasState.zoom = newZoom;
+    applyTransform();
+  }, { passive: false });
+
+  // Zoom buttons
+  document.getElementById('zoom-in') ?.addEventListener('click', () => {
+    canvasState.zoom = Math.min(ZOOM_MAX, canvasState.zoom * 1.2); applyTransform();
+  });
+  document.getElementById('zoom-out')?.addEventListener('click', () => {
+    canvasState.zoom = Math.max(ZOOM_MIN, canvasState.zoom / 1.2); applyTransform();
+  });
+  document.getElementById('zoom-fit')?.addEventListener('click', fitToScenes);
 }
+bindCanvasInteractions();
 
 /* ═══════════════════════════════════════════════
-   AUTO MODE
+   GENERATE SCENES (real backend → Doubao Seedream)
 ═══════════════════════════════════════════════ */
-function autoGenerate() {
-  const prompt = document.getElementById('auto-prompt').value.trim();
-  if (!prompt) return;
+async function generateScene(i) {
+  const scene = scenes[i];
+  if (!scene) return;
 
-  const numScenes = Math.min(8, Math.max(2, +document.getElementById('auto-scene-num').value || 4));
-
-  // build scenes from prompt
-  const words = prompt.split(/\s+/);
-  const perScene = Math.ceil(words.length / numScenes);
-
-  scenes = [];
-  for (let i = 0; i < numScenes; i++) {
-    const chunk = words.slice(i * perScene, (i + 1) * perScene).join(' ');
-    const startSec = i * Math.round(45 / numScenes);
-    const endSec = (i + 1) * Math.round(45 / numScenes);
-    scenes.push({
-      prompt: chunk || `Scene ${i + 1} from: "${prompt.slice(0, 30)}..."`,
-      shot: SHOT_TYPES[i % SHOT_TYPES.length],
-      camera: CAMERA_MOVES[i % CAMERA_MOVES.length],
-      duration: `${startSec}-${endSec}s`,
-      generated: false,
-    });
+  // Lazy-persist if this scene has never been saved to the backend.
+  // Covers: the 3 in-memory default scenes + any locally-pushed scene.
+  // Uses the CURRENT local prompt/shot/camera/duration so whatever the
+  // user typed is saved verbatim.
+  if (!scene._id) {
+    if (!API.projectId) {
+      flashToast('No project loaded — try reloading the page', true);
+      return;
+    }
+    try {
+      const created = await API.addScene({
+        prompt:      scene.prompt || '',
+        shot_type:   scene.shot,
+        camera_move: scene.camera,
+        duration:    scene.duration,
+        sort_order:  i,
+      });
+      if (!created || !created.id) {
+        throw new Error(created?.error || 'save failed');
+      }
+      scene._id = created.id;
+    } catch (e) {
+      console.error('lazy-persist failed:', e);
+      flashToast('Could not save scene: ' + (e.message || 'unknown'), true);
+      return;
+    }
   }
 
-  renderTimeline();
+  scene.status     = 'generating';
+  scene.image_path = null;
+  scene._imgKey    = '';
+  renderCanvas();
 
-  // auto-generate all
-  setTimeout(generateAll, 400);
+  try {
+    await API.generateSceneImage(scene._id, { aspect: currentAspect });
+    startPolling({ intervalMs: 2500, maxAttempts: 40 });
+  } catch (e) {
+    console.error('generateScene failed:', e);
+    scene.status = 'error';
+    renderCanvas();
+    flashToast('Generation failed: ' + (e.message || 'unknown'), true);
+  }
+}
+
+async function generateAll() {
+  if (!API.projectId) {
+    flashToast('No project loaded — try reloading the page', true);
+    return;
+  }
+
+  // Lazy-persist any scenes that don't have a backend _id yet (covers
+  // manual-mode flow: default 3 scenes + any ADD SCENE additions that
+  // were somehow never round-tripped).
+  const toPersist = scenes
+    .map((s, i) => ({ s, i }))
+    .filter(({ s }) => !s._id);
+
+  if (toPersist.length > 0) {
+    try {
+      for (const { s, i } of toPersist) {
+        const created = await API.addScene({
+          prompt:      s.prompt || '',
+          shot_type:   s.shot,
+          camera_move: s.camera,
+          duration:    s.duration,
+          sort_order:  i,
+        });
+        if (!created || !created.id) {
+          throw new Error(created?.error || 'save failed');
+        }
+        s._id = created.id;
+      }
+    } catch (e) {
+      console.error('generateAll lazy-persist failed:', e);
+      flashToast('Could not save scenes: ' + (e.message || 'unknown'), true);
+      return;
+    }
+  }
+
+  // Mark them visually as generating so the spinners show immediately.
+  scenes.forEach(s => { s.status = 'generating'; s.image_path = null; s._imgKey = ''; });
+  renderCanvas();
+
+  try {
+    await API.generateAllScenes({ aspect: currentAspect });
+    startPolling({ intervalMs: 2500, maxAttempts: 60 });
+  } catch (e) {
+    console.error('generateAll failed:', e);
+    flashToast('Bulk generate failed: ' + (e.message || 'unknown'), true);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   AUTO MODE (real backend: Kimi splits → Doubao paints)
+═══════════════════════════════════════════════ */
+async function autoGenerate() {
+  const prompt = document.getElementById('auto-prompt').value.trim();
+  if (!prompt) {
+    flashToast('Enter or upload a script first', true);
+    return;
+  }
+  const numScenes = Math.min(8, Math.max(2, +document.getElementById('auto-scene-num').value || 4));
+
+  // Optimistic placeholder: show greyed-out scenes immediately so the
+  // user gets visual feedback while Kimi splits + Doubao starts painting.
+  scenes = Array.from({ length: numScenes }, (_, i) => ({
+    prompt:    'Splitting script with AI…',
+    shot:      SHOT_TYPES[i % SHOT_TYPES.length],
+    camera:    CAMERA_MOVES[i % CAMERA_MOVES.length],
+    duration:  `${i * Math.round(45 / numScenes)}-${(i + 1) * Math.round(45 / numScenes)}s`,
+    status:    'generating',
+    generated: false,
+  }));
+  autoLayout();
+  renderCanvas();
+
+  const btn = document.getElementById('auto-generate');
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'GENERATING…';
+
+  try {
+    // Backend: Kimi-splits the script, inserts scene rows (status=generating),
+    // and kicks off Doubao image generation with a 500ms stagger per scene.
+    const created = await API.autoGenerateScenes(prompt, numScenes, { aspect: currentAspect });
+    if (!Array.isArray(created)) {
+      throw new Error(created?.error || 'unexpected response');
+    }
+    // Replace optimistic scenes with the real ones (so they have _id).
+    // Reset positions so autoLayout fills them in fresh.
+    scenes = created.map((s, i) => ({
+      _id:        s.id,
+      prompt:     s.prompt,
+      shot:       s.shot_type,
+      camera:     s.camera_move,
+      duration:   s.duration,
+      status:     s.status,
+      generated:  s.status === 'done',
+      image_path: s.image_path,
+      _imgKey:    s.image_path ? `${s.image_path}?t=${Date.now()}` : '',
+      x:          undefined,
+      y:          undefined,
+    }));
+    autoLayout();
+    renderCanvas();
+    fitToScenes();
+    startPolling({ intervalMs: 2500, maxAttempts: 80 });
+  } catch (e) {
+    console.error('autoGenerate failed:', e);
+    flashToast('Auto-generate failed: ' + (e.message || 'unknown'), true);
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   TINY TOAST  (so failures aren't silent)
+═══════════════════════════════════════════════ */
+function flashToast(msg, isError) {
+  let t = document.getElementById('sb-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'sb-toast';
+    t.style.cssText = `
+      position:fixed; top:80px; right:32px; z-index:9999;
+      max-width:340px; padding:12px 16px; border-radius:10px;
+      font-size:12px; letter-spacing:.5px;
+      backdrop-filter: blur(20px);
+      transition: opacity .3s ease;
+    `;
+    document.body.appendChild(t);
+  }
+  t.style.background = isError ? 'rgba(255,40,60,.18)' : 'rgba(180,0,255,.18)';
+  t.style.border     = isError ? '1px solid rgba(255,40,60,.45)' : '1px solid rgba(180,0,255,.45)';
+  t.style.color      = isError ? '#ff7878' : '#d8aaff';
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(flashToast._t);
+  flashToast._t = setTimeout(() => { t.style.opacity = '0'; }, 4500);
 }
 
 /* ═══════════════════════════════════════════════
@@ -964,6 +1947,10 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
     } else {
       autoBar.classList.remove('show');
     }
+    // Show/hide manual-only controls (the ADD SCENE button)
+    document.querySelectorAll('.manual-only').forEach(el => {
+      el.style.display = currentMode === 'manual' ? '' : 'none';
+    });
   });
 });
 
@@ -972,14 +1959,83 @@ document.querySelectorAll('.mode-btn').forEach(btn => {
 ═══════════════════════════════════════════════ */
 document.getElementById('btn-generate-all').addEventListener('click', generateAll);
 
+// + ADD SCENE — manual mode only.
+// IMPORTANT: persist to the backend FIRST so we have an _id before
+// pushing locally. Otherwise a concurrent poll tick (e.g. from a pending
+// generation) replaces `scenes` with the backend list — which doesn't
+// yet know about the new scene — and we see the card flash in then out.
+document.getElementById('btn-add-scene').addEventListener('click', async (ev) => {
+  if (scenes.length >= 8) {
+    flashToast('Max 8 scenes per project', true);
+    return;
+  }
+  const btn = ev.currentTarget;
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'ADDING…';
+
+  const last    = scenes[scenes.length - 1] || {};
+  const lastEnd = parseInt((last.duration || '0-4s').split('-')[1]) || (scenes.length * 4);
+  const seed = {
+    prompt:     '',
+    shot_type:  SHOT_TYPES[scenes.length % SHOT_TYPES.length],
+    camera_move:CAMERA_MOVES[scenes.length % CAMERA_MOVES.length],
+    duration:   `${lastEnd}-${lastEnd + 4}s`,
+    sort_order: scenes.length,
+  };
+
+  try {
+    let created = null;
+    if (API.projectId) {
+      created = await API.addScene(seed);
+      if (!created || !created.id) throw new Error(created?.error || 'no id returned');
+    }
+    const newScene = {
+      _id:       created?.id,
+      prompt:    seed.prompt,
+      shot:      seed.shot_type,
+      camera:    seed.camera_move,
+      duration:  seed.duration,
+      generated: false,
+      // Omit status — the DB default of 'pending' means "idle / ready to
+      // generate" and will render as CLICK TO GENERATE (no spinner).
+      x:         (last.x !== undefined ? last.x : ORIGIN_X) + NODE_W + GAP_X,
+      y:         last.y !== undefined ? last.y : ORIGIN_Y,
+    };
+    scenes.push(newScene);
+    renderCanvas();
+  } catch (e) {
+    console.error('addScene failed:', e);
+    flashToast('Add scene failed: ' + (e.message || 'unknown'), true);
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+  }
+});
+
 document.getElementById('btn-clear').addEventListener('click', () => {
   scenes = [
     { prompt: '', shot: 'Wide Shot', camera: 'Static', duration: '0-4s', generated: false },
   ];
-  renderTimeline();
+  autoLayout();
+  renderCanvas();
 });
 
 document.getElementById('auto-generate').addEventListener('click', autoGenerate);
+
+/* ── auto-grow the auto-prompt textarea ──────── */
+(() => {
+  const t = document.getElementById('auto-prompt');
+  if (!t) return;
+  const grow = () => {
+    t.style.height = 'auto';
+    t.style.height = Math.min(t.scrollHeight, 180) + 'px';
+  };
+  t.addEventListener('input', grow);
+  // Also grow on programmatic value changes (e.g. file upload)
+  const obs = new MutationObserver(grow);
+  obs.observe(t, { attributes: true, attributeFilter: ['value'] });
+  // Run once after upload populates
+  window.__autoPromptGrow = grow;
+})();
 
 /* ── UPLOAD-YOUR-OWN-SCRIPT (auto-mode) ──────── */
 (() => {
@@ -1010,6 +2066,7 @@ document.getElementById('auto-generate').addEventListener('click', autoGenerate)
       const truncated = text.length > 2000;
       if (truncated) text = text.slice(0, 2000);
       promptEl.value = text;
+      if (typeof window.__autoPromptGrow === 'function') window.__autoPromptGrow();
       uploadHint.style.color = 'rgba(180,0,255,.85)';
       uploadHint.textContent = `Loaded ${file.name} — ${text.length} chars${truncated ? ' (truncated to 2000)' : ''}`;
     };
@@ -1022,44 +2079,141 @@ document.getElementById('auto-generate').addEventListener('click', autoGenerate)
   });
 })();
 
-// aspect ratio chips
+// aspect ratio chips — drive the currentAspect used by all generate calls
 document.querySelectorAll('.aspect-chip').forEach(chip => {
   chip.addEventListener('click', () => {
     document.querySelectorAll('.aspect-chip').forEach(c => c.classList.remove('active'));
     chip.classList.add('active');
+    currentAspect = chip.dataset.ratio || '16:9';
   });
 });
 
-// export btn (visual feedback)
+// EXPORT TO VIDEO — placeholder (real video export needs server-side ffmpeg)
 document.getElementById('btn-export').addEventListener('click', () => {
-  const btn = document.getElementById('btn-export');
-  btn.textContent = 'EXPORTING...';
-  btn.style.opacity = '.6';
-  setTimeout(() => {
-    btn.textContent = 'EXPORTED ✓';
-    setTimeout(() => {
-      btn.textContent = 'EXPORT TO VIDEO →';
-      btn.style.opacity = '';
-    }, 1500);
-  }, 2000);
+  flashToast('Video export coming soon — for now use DOWNLOAD PDF', false);
 });
 
-// download (text-based storyboard)
-document.getElementById('btn-download').addEventListener('click', () => {
-  let content = '═══════════════════════════════\n  VSHORT STORYBOARD\n═══════════════════════════════\n\n';
-  scenes.forEach((s, i) => {
-    content += `SCENE ${String(i+1).padStart(2,'0')}  |  ${s.duration}  |  ${s.shot}  |  ${s.camera}\n`;
-    content += `─────────────────────────────\n`;
-    content += `${s.prompt || '(no description)'}\n\n`;
-  });
-  const blob = new Blob([content], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'vshort-storyboard.txt';
-  a.click();
-  URL.revokeObjectURL(url);
+// DOWNLOAD PDF — real PDF (jsPDF) with all generated images + scene info.
+// Falls back gracefully if some scenes have no image.
+document.getElementById('btn-download').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-download');
+  const orig = btn.textContent;
+
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    flashToast('PDF library failed to load (check network)', true);
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'BUILDING PDF…';
+  try {
+    const { jsPDF } = window.jspdf;
+    // A4 landscape — wide enough for image + caption side-by-side
+    const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();   // 842
+    const pageH = pdf.internal.pageSize.getHeight();  // 595
+
+    // Cover page
+    pdf.setFillColor(6, 6, 10);
+    pdf.rect(0, 0, pageW, pageH, 'F');
+    pdf.setTextColor(180, 0, 255);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(36);
+    pdf.text('VSHORT', 60, 130);
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(28);
+    pdf.text('STORYBOARD', 60, 175);
+    pdf.setFontSize(11);
+    pdf.setTextColor(180, 180, 200);
+    pdf.text(`${scenes.length} scene${scenes.length === 1 ? '' : 's'}  ·  generated ${new Date().toLocaleString()}`, 60, 205);
+
+    // One page per scene
+    for (let i = 0; i < scenes.length; i++) {
+      const s = scenes[i];
+      pdf.addPage('a4', 'landscape');
+      pdf.setFillColor(6, 6, 10);
+      pdf.rect(0, 0, pageW, pageH, 'F');
+
+      const padX = 40, padY = 40;
+      const imgW = 460, imgH = 460;
+
+      // Header
+      pdf.setTextColor(180, 0, 255);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(14);
+      pdf.text(`SCENE ${String(i + 1).padStart(2, '0')}`, padX, padY + 6);
+      pdf.setTextColor(150, 150, 170);
+      pdf.setFontSize(9);
+      pdf.text(s.duration || '', padX + 80, padY + 6);
+
+      // Image (if any)
+      if (s.image_path) {
+        try {
+          const dataUrl = await imgUrlToDataUrl(s.image_path);
+          // Add image — assume JPG (Doubao default). PNG works too thanks to jsPDF heuristics.
+          pdf.addImage(dataUrl, 'JPEG', padX, padY + 24, imgW, imgH, undefined, 'FAST');
+        } catch (e) {
+          pdf.setTextColor(255, 80, 80);
+          pdf.text('(image load failed)', padX, padY + 100);
+        }
+      } else {
+        pdf.setDrawColor(80, 80, 100);
+        pdf.rect(padX, padY + 24, imgW, imgH);
+        pdf.setTextColor(120, 120, 140);
+        pdf.setFontSize(11);
+        pdf.text('(no image generated yet)', padX + imgW / 2 - 70, padY + 24 + imgH / 2);
+      }
+
+      // Right column — metadata + prompt
+      const rx = padX + imgW + 30;
+      pdf.setTextColor(180, 0, 255);
+      pdf.setFontSize(9);
+      pdf.text('SHOT TYPE', rx, padY + 30);
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(13);
+      pdf.text(s.shot || '—', rx, padY + 48);
+
+      pdf.setTextColor(180, 0, 255);
+      pdf.setFontSize(9);
+      pdf.text('CAMERA', rx, padY + 80);
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(13);
+      pdf.text(s.camera || '—', rx, padY + 98);
+
+      pdf.setTextColor(180, 0, 255);
+      pdf.setFontSize(9);
+      pdf.text('DESCRIPTION', rx, padY + 130);
+      pdf.setTextColor(220, 220, 230);
+      pdf.setFontSize(11);
+      const wrapped = pdf.splitTextToSize(s.prompt || '(no description)', pageW - rx - padX);
+      pdf.text(wrapped, rx, padY + 152);
+
+      // Footer
+      pdf.setTextColor(80, 80, 100);
+      pdf.setFontSize(8);
+      pdf.text(`${i + 1} / ${scenes.length}`, pageW - 60, pageH - 20);
+    }
+
+    pdf.save(`vshort-storyboard-${Date.now()}.pdf`);
+  } catch (e) {
+    console.error('PDF export failed:', e);
+    flashToast('PDF export failed: ' + (e.message || 'unknown'), true);
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+  }
 });
+
+// Fetch an image URL → data URL so jsPDF can embed it.
+async function imgUrlToDataUrl(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`image fetch ${res.status}`);
+  const blob = await res.blob();
+  return await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload  = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(blob);
+  });
+}
 
 /* ═══════════════════════════════════════════════
    PARTICLES
@@ -1088,7 +2242,8 @@ function spawnParticles() {
 ═══════════════════════════════════════════════ */
 function exitToDial() {
   document.getElementById('tri-exit').classList.add('on');
-  setTimeout(() => { window.location.href = 'index.html#skip-intro'; }, 800);
+  // Return to the dial with storyboard (page 1) as the active card
+  setTimeout(() => { window.location.href = 'index.html#skip-intro-1'; }, 800);
 }
 
 document.getElementById('back-btn').addEventListener('click', exitToDial);
@@ -1100,7 +2255,9 @@ document.querySelector('.logo').addEventListener('click', e => {
 /* ═══════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════ */
-renderTimeline();
+autoLayout();
+renderCanvas();
+applyTransform();   // initialize zoom indicator + dot-grid alignment
 </script>
 </body>
 </html>

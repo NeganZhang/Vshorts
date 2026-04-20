@@ -169,28 +169,27 @@ const API = {
       return null;
     }
 
+    // Try URL param first, then localStorage. Either way we VERIFY the
+    // project still exists for this user — otherwise a deleted project
+    // in the URL / localStorage would wedge the page with 404 polling.
     const params = new URLSearchParams(window.location.search);
-    let pid = params.get('project');
+    const candidates = [params.get('project'), localStorage.getItem('vshort_project')]
+      .filter(Boolean);
 
-    if (pid) {
-      this.projectId = pid;
-      localStorage.setItem('vshort_project', pid);
-      return pid;
-    }
-
-    // Try localStorage
-    pid = localStorage.getItem('vshort_project');
-    if (pid) {
+    for (const pid of candidates) {
       try {
         const res = await fetch(`${this.base}/projects/${pid}`, {
           headers: await this._authHeaders(),
         });
         if (res.ok) {
           this.projectId = pid;
+          localStorage.setItem('vshort_project', pid);
           return pid;
         }
-      } catch (e) { /* fall through */ }
+      } catch (e) { /* try next candidate */ }
     }
+    // None of the candidates worked — drop the stale localStorage id
+    localStorage.removeItem('vshort_project');
 
     // Create a new default project
     const project = await this.createProject('My Project');
@@ -275,27 +274,29 @@ const API = {
     return res.json();
   },
 
-  async generateSceneImage(sceneId) {
+  async generateSceneImage(sceneId, opts = {}) {
     const res = await fetch(`${this.base}/projects/${this.projectId}/scenes/${sceneId}/generate`, {
       method: 'POST',
-      headers: await this._authHeaders(),
+      headers: await this._headers(),
+      body: JSON.stringify({ aspect: opts.aspect || null }),
     });
     return res.json();
   },
 
-  async generateAllScenes() {
+  async generateAllScenes(opts = {}) {
     const res = await fetch(`${this.base}/projects/${this.projectId}/scenes/generate-all`, {
       method: 'POST',
-      headers: await this._authHeaders(),
+      headers: await this._headers(),
+      body: JSON.stringify({ aspect: opts.aspect || null }),
     });
     return res.json();
   },
 
-  async autoGenerateScenes(prompt, numScenes) {
+  async autoGenerateScenes(prompt, numScenes, opts = {}) {
     const res = await fetch(`${this.base}/projects/${this.projectId}/scenes/auto-generate`, {
       method: 'POST',
       headers: await this._headers(),
-      body: JSON.stringify({ prompt, numScenes }),
+      body: JSON.stringify({ prompt, numScenes, aspect: opts.aspect || null }),
     });
     return res.json();
   },

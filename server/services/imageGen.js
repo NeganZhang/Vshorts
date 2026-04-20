@@ -11,9 +11,24 @@ const db  = require('../db');
 // Doubao is preferred for users in mainland China: no proxy needed,
 // strong on Chinese subject matter, cheap pay-as-you-go.
 const DOUBAO_API_KEY = process.env.DOUBAO_API_KEY || '';
-const DOUBAO_MODEL   = process.env.DOUBAO_MODEL   || 'doubao-seedream-3-0-t2i-250415';
+const DOUBAO_MODEL   = process.env.DOUBAO_MODEL   || 'doubao-seedream-5-0-260128';
 const DOUBAO_URL     = process.env.DOUBAO_URL     || 'https://ark.cn-beijing.volces.com/api/v3/images/generations';
-const DOUBAO_SIZE    = process.env.DOUBAO_SIZE    || '720x1280';   // 9:16 vertical
+// Seedream 5.0 supports preset sizes: "1K" / "2K" / "4K".
+// Older Seedream 3.0/4.0 used pixel sizes like "720x1280". We accept either.
+const DOUBAO_SIZE    = process.env.DOUBAO_SIZE    || '2K';
+const DOUBAO_WATERMARK = String(process.env.DOUBAO_WATERMARK || 'false').toLowerCase() === 'true';
+
+// Map a UI aspect ratio chip to a Seedream-supported size.
+// Seedream 5.0 requires >= 3,686,400 pixels (≈ 1920²), so every preset
+// below is sized to exceed that minimum comfortably.
+const ASPECT_SIZE = {
+  '9:16': '1620x2880',   // 4.67M px, portrait shorts
+  '16:9': '2880x1620',   // 4.67M px, cinematic widescreen
+  '1:1':  '2048x2048',   // 4.19M px, square
+};
+function sizeForAspect(aspect) {
+  return aspect && ASPECT_SIZE[aspect] ? ASPECT_SIZE[aspect] : DOUBAO_SIZE;
+}
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL   = process.env.GEMINI_MODEL   || 'gemini-2.5-flash-image';
@@ -49,21 +64,26 @@ function extFromMime(mime) {
   return MIME_EXT[mime] || '.png';
 }
 
-function buildImagePrompt(scene) {
+function buildImagePrompt(scene, aspect) {
+  const aspectHint = aspect === '9:16' ? '9:16 vertical aspect (portrait)'
+                   : aspect === '16:9' ? '16:9 horizontal aspect (landscape, cinematic widescreen)'
+                   : aspect === '1:1'  ? '1:1 square aspect'
+                   : '9:16 vertical aspect';
   const parts = [
     (scene.prompt || 'storyboard frame').trim(),
     scene.shot_type   ? `Shot type: ${scene.shot_type}.`   : '',
     scene.camera_move ? `Camera move: ${scene.camera_move}.` : '',
-    'Cinematic short-video storyboard frame, 9:16 vertical aspect,',
+    `Cinematic short-video storyboard frame, ${aspectHint},`,
     'dramatic lighting, high detail, no text overlays, no watermark.',
   ];
   return parts.filter(Boolean).join(' ');
 }
 
-// ─── Doubao (Volcengine Ark) image generation ───
-async function callDoubao(prompt, sceneId) {
+// ─── Doubao Seedream image generation ────────────
+async function callDoubao(prompt, sceneId, opts = {}) {
+  const size = opts.size || DOUBAO_SIZE;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 90_000);
+  const timer = setTimeout(() => controller.abort(), 120_000);
 
   let res;
   try {
@@ -76,9 +96,11 @@ async function callDoubao(prompt, sceneId) {
       body: JSON.stringify({
         model:           DOUBAO_MODEL,
         prompt,
-        size:            DOUBAO_SIZE,
-        response_format: 'b64_json',   // embed bytes so we don't rely on URL TTL
-        watermark:       false,
+        size,
+        sequential_image_generation: 'disabled',  // single image (Seedream 5.0)
+        response_format: 'url',                   // pre-signed URL — we re-download
+        stream:          false,
+        watermark:       DOUBAO_WATERMARK,
       }),
       signal: controller.signal,
     });
@@ -96,18 +118,19 @@ async function callDoubao(prompt, sceneId) {
   if (!item) throw new Error(`Doubao returned no image data: ${JSON.stringify(data).slice(0, 300)}`);
 
   let buffer, ext = '.png';
-  if (item.b64_json) {
-    buffer = Buffer.from(item.b64_json, 'base64');
-  } else if (item.url) {
-    // fall-through: fetch the URL if Doubao returned a pre-signed link
+  if (item.url) {
+    // Volcengine returns a pre-signed URL that expires in ~24h — download
+    // immediately and persist to local disk so we own the asset.
     const imgRes = await fetch(item.url);
     if (!imgRes.ok) throw new Error(`Doubao image URL ${imgRes.status}`);
     const ab = await imgRes.arrayBuffer();
     buffer = Buffer.from(ab);
     const ct = imgRes.headers.get('content-type') || '';
     ext = extFromMime(ct);
+  } else if (item.b64_json) {
+    buffer = Buffer.from(item.b64_json, 'base64');
   } else {
-    throw new Error('Doubao response had neither b64_json nor url');
+    throw new Error('Doubao response had neither url nor b64_json');
   }
 
   const fname = sceneId + ext;
@@ -169,8 +192,13 @@ if (DOUBAO_API_KEY) {
 /**
  * Generate an image for a storyboard scene.
  * Dispatches to the first configured provider (Doubao → Gemini → mock).
+ *
+ * opts:
+ *   aspect  '9:16' | '16:9' | '1:1'  — maps to a Seedream-supported pixel size
  */
-async function generateSceneImage(sceneId, scene) {
+async function generateSceneImage(sceneId, scene, opts = {}) {
+  const size = sizeForAspect(opts.aspect);
+
   // Mock fallback when no provider is configured
   if (!DOUBAO_API_KEY && !GEMINI_API_KEY) {
     try {
@@ -185,9 +213,9 @@ async function generateSceneImage(sceneId, scene) {
   }
 
   try {
-    const prompt = buildImagePrompt(scene || {});
+    const prompt = buildImagePrompt(scene || {}, opts.aspect);
     const url    = DOUBAO_API_KEY
-      ? await callDoubao(prompt, sceneId)
+      ? await callDoubao(prompt, sceneId, { size })
       : await callGemini(prompt, sceneId);
     db.prepare('UPDATE scenes SET status = ?, image_path = ? WHERE id = ?')
       .run('done', url, sceneId);

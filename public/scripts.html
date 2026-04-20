@@ -66,7 +66,9 @@
       position: fixed; top: 0; left: 0; right: 0;
       padding: 22px 40px;
       display: flex; align-items: center; justify-content: space-between;
-      z-index: 100;
+      /* Sit ABOVE the result-view (z-index: 150) so the back button stays
+         clickable after the script is generated. */
+      z-index: 200;
       backdrop-filter: blur(12px);
     }
     .logo {
@@ -78,22 +80,36 @@
       font-size: 11px; letter-spacing: 5px; font-weight: 700;
       color: rgba(255,255,255,.35);
     }
+    /* ── LIQUID-GLASS BACK BUTTON ── */
     .back-btn {
       display: flex; align-items: center; justify-content: center;
-      width: 42px; height: 42px;
-      border: 1px solid rgba(255,255,255,.15);
+      width: 44px; height: 44px;
+      border: 1px solid rgba(255,255,255,.14);
+      border-top-color: rgba(255,255,255,.28);
       border-radius: 50%;
-      background: rgba(255,255,255,.04);
+      background: linear-gradient(180deg,
+        rgba(255,255,255,.08) 0%,
+        rgba(255,255,255,.02) 60%,
+        rgba(0,212,255,.05) 100%);
+      backdrop-filter: blur(20px) saturate(160%);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
       cursor: pointer;
-      transition: background .3s, border-color .3s, transform .3s ease;
-      backdrop-filter: blur(8px);
+      transition: all .25s ease;
       text-decoration: none;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.14) inset,
+        0 4px 14px rgba(0,0,0,.3);
     }
     .back-btn:hover {
-      background: rgba(0,212,255,.1);
-      border-color: rgba(0,212,255,.4);
+      background: linear-gradient(180deg,
+        rgba(0,212,255,.18) 0%,
+        rgba(0,212,255,.06) 100%);
+      border-color: rgba(0,212,255,.45);
       transform: translateY(-2px);
-      box-shadow: 0 4px 14px rgba(0,212,255,.15);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.18) inset,
+        0 0 18px rgba(0,212,255,.3),
+        0 6px 18px rgba(0,0,0,.35);
     }
     .back-btn svg {
       width: 18px; height: 18px;
@@ -468,13 +484,21 @@
       border-radius: 14px;
       cursor: pointer;
       transition: all .3s ease;
+      /* Gentle 1px inset highlight at the top — no hard rim, just a
+         hint of lit glass. Plus a subtle elevation shadow. */
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.14) inset,
+        0 3px 12px rgba(0,0,0,.2);
     }
     #dl-btn:hover {
       background: linear-gradient(135deg,
         rgba(0,212,255,.3) 0%, rgba(0,212,255,.12) 100%);
       border-color: rgba(0,212,255,.5);
       transform: translateY(-2px);
-      box-shadow: 0 6px 20px rgba(0,212,255,.15);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.22) inset,
+        0 6px 20px rgba(0,212,255,.15),
+        0 6px 18px rgba(0,0,0,.28);
     }
 
     /* triangle icon in button */
@@ -489,26 +513,83 @@
       color: var(--accent);
     }
 
-    /* ── NEW SCRIPT BTN ── */
+    /* ── NEW SCRIPT BTN (subtle glass, no hard rim) ── */
     #new-btn {
       margin-top: 14px;
       padding: 10px 24px;
       border: 1px solid rgba(255,255,255,.12);
       border-radius: 40px;
-      background: rgba(255,255,255,.04);
-      color: rgba(255,255,255,.5);
+      /* Very gentle top→bottom gradient so it's not completely flat */
+      background: linear-gradient(180deg,
+        rgba(255,255,255,.07) 0%,
+        rgba(255,255,255,.025) 100%);
+      color: rgba(255,255,255,.55);
       font-size: 10px; letter-spacing: 2px;
       cursor: pointer;
-      transition: all .3s ease;
       opacity: 0;
-      transition: opacity .5s ease .3s, background .3s ease, border-color .3s ease;
+      /* Subtle inset highlight — just a faint lit edge, no chrome */
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.10) inset,
+        0 2px 6px rgba(0,0,0,.15);
+      transition: opacity .5s ease .3s, background .3s ease, border-color .3s ease, box-shadow .3s ease, color .3s ease;
     }
     #new-btn.show { opacity: 1; }
     #new-btn:hover {
-      background: rgba(255,255,255,.08);
-      border-color: rgba(255,255,255,.25);
-      color: rgba(255,255,255,.7);
+      background: linear-gradient(180deg,
+        rgba(255,255,255,.12) 0%,
+        rgba(255,255,255,.04) 100%);
+      border-color: rgba(255,255,255,.22);
+      color: rgba(255,255,255,.8);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.15) inset,
+        0 4px 12px rgba(0,0,0,.22);
     }
+
+    /* ── action-row wrapping DOWNLOAD + SEND-TO-STORYBOARD ── */
+    #action-row {
+      display: flex; gap: 14px; align-items: center; justify-content: center;
+      margin-top: 24px;
+      opacity: 0;
+      transition: opacity .5s ease;
+      flex-wrap: wrap;
+    }
+    #action-row.show { opacity: 1; }
+
+    /* ── SEND TO STORYBOARD (primary, cinematic cyan) ── */
+    #sb-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 28px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.22);
+      border-top-color: rgba(255,255,255,.4);
+      background: linear-gradient(180deg,
+        rgba(0,212,255,.8) 0%,
+        rgba(0,160,210,.7) 100%);
+      backdrop-filter: blur(16px) saturate(160%);
+      color: #06060a;
+      font-size: 12px; font-weight: 800; letter-spacing: 2px;
+      cursor: pointer;
+      transition: all .25s ease;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.35) inset,
+        0 -1px 0 rgba(0,0,0,.2) inset,
+        0 4px 16px rgba(0,212,255,.25);
+    }
+    #sb-btn:hover {
+      background: linear-gradient(180deg,
+        rgba(40,230,255,.9) 0%,
+        rgba(0,180,230,.8) 100%);
+      transform: translateY(-2px);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.4) inset,
+        0 0 24px rgba(0,212,255,.6),
+        0 6px 20px rgba(0,0,0,.35);
+    }
+    #sb-btn .sb-arrow {
+      font-size: 14px;
+      font-weight: 900;
+    }
+
 
     /* ─── EXIT TRANSITION (back to landing) ───── */
     #tri-exit {
@@ -656,7 +737,7 @@
     <div id="result-content"></div>
     <span id="res-cursor"></span>
   </div>
-  <div id="dl-wrap">
+  <div id="action-row">
     <button id="dl-btn">
       <svg class="tri-icon" viewBox="0 0 200 200">
         <polygon points="100,20 175,160 25,160"
@@ -672,6 +753,10 @@
         </defs>
       </svg>
       <span class="dl-label">DOWNLOAD</span>
+    </button>
+    <button id="sb-btn" title="Use this script to generate a storyboard">
+      <span class="sb-label">SEND TO STORYBOARD</span>
+      <span class="sb-arrow">→</span>
     </button>
   </div>
   <button id="new-btn">WRITE ANOTHER →</button>
@@ -827,7 +912,7 @@ const genOverlay = document.getElementById('gen-overlay');
 const resultView = document.getElementById('result-view');
 const resultContent = document.getElementById('result-content');
 const resCursor  = document.getElementById('res-cursor');
-const dlWrap     = document.getElementById('dl-wrap');
+const actionRow  = document.getElementById('action-row');
 const newBtn     = document.getElementById('new-btn');
 
 async function startGeneration() {
@@ -891,7 +976,7 @@ function typeOutResult(text) {
     } else {
       /* done — show download */
       resCursor.style.display = 'none';
-      dlWrap.classList.add('show');
+      actionRow.classList.add('show');
       newBtn.classList.add('show');
     }
   }
@@ -901,6 +986,22 @@ function typeOutResult(text) {
 /* ═══════════════════════════════════════════════
    DOWNLOAD
 ═══════════════════════════════════════════════ */
+/* SEND TO STORYBOARD — stash the generated script in sessionStorage and
+   navigate to /storyboard.html. The storyboard page picks it up on load,
+   switches to AUTO mode, fills the prompt, and clears the storage. */
+document.getElementById('sb-btn').addEventListener('click', () => {
+  const content = resultContent.textContent || '';
+  try {
+    sessionStorage.setItem('vshort_pending_script', content);
+  } catch (e) {
+    console.warn('sessionStorage unavailable:', e);
+  }
+  // Re-use the exit transition animation for a smooth handoff
+  const triExit = document.getElementById('tri-exit');
+  triExit.classList.add('on');
+  setTimeout(() => { window.location.href = 'storyboard.html?fromScript=1'; }, 800);
+});
+
 document.getElementById('dl-btn').addEventListener('click', () => {
   const content = resultContent.textContent;
   const blob = new Blob([content], { type: 'text/plain' });
@@ -917,7 +1018,7 @@ document.getElementById('dl-btn').addEventListener('click', () => {
 ═══════════════════════════════════════════════ */
 newBtn.addEventListener('click', () => {
   resultView.classList.remove('on');
-  dlWrap.classList.remove('show');
+  actionRow.classList.remove('show');
   newBtn.classList.remove('show');
 
   typedText.value = '';
@@ -965,7 +1066,8 @@ function exitToDial() {
   const triExit = document.getElementById('tri-exit');
   triExit.classList.add('on');
   setTimeout(() => {
-    window.location.href = 'index.html#skip-intro';
+    // Return to the dial with scripts (page 0) as the active card
+    window.location.href = 'index.html#skip-intro-0';
   }, 800);
 }
 
