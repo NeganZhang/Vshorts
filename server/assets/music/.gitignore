@@ -1,0 +1,8 @@
+# Keep this directory in git but exclude audio binaries until their
+# licenses are documented in LICENSES.md.
+*.mp3
+*.m4a
+*.wav
+!.gitignore
+!README.md
+!LICENSES.md

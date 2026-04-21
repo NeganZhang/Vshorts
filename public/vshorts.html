@@ -199,50 +199,21 @@
       color: rgba(255,255,255,.12);
     }
 
-    /* preview content (shown after "upload") */
+    /* preview content (shown after first upload) */
     #preview-content {
       display: none;
       position: absolute; inset: 0;
       border-radius: 16px;
       overflow: hidden;
+      background: #000;
     }
     #preview-content.show { display: block; }
 
-    .preview-gradient {
-      position: absolute; inset: 0;
-      background: linear-gradient(180deg,
-        #1a0800 0%, #331500 30%, #1a0800 60%, #0d0400 100%);
-    }
-
-    /* fake video elements */
-    .fake-caption {
-      position: absolute;
-      bottom: 80px; left: 50%;
-      transform: translateX(-50%);
-      padding: 8px 20px;
-      background: rgba(0,0,0,.7);
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 700;
-      color: #fff;
-      text-align: center;
-      text-shadow: 0 2px 8px rgba(0,0,0,.8);
-      white-space: nowrap;
-    }
-
-    .fake-progress-bar {
-      position: absolute;
-      bottom: 0; left: 0; right: 0;
-      height: 4px;
-      background: rgba(255,255,255,.1);
-    }
-    .fake-progress-fill {
-      height: 100%;
-      width: 0%;
-      background: var(--accent);
-      box-shadow: 0 0 8px var(--accent);
-      border-radius: 2px;
-      transition: width 3s linear;
+    #preview-video {
+      width: 100%; height: 100%;
+      object-fit: contain;
+      background: #000;
+      display: block;
     }
 
     .play-btn-overlay {
@@ -258,11 +229,35 @@
       transition: all .3s ease;
       backdrop-filter: blur(8px);
     }
+    .play-btn-overlay.hidden { opacity: 0; pointer-events: none; }
     .play-btn-overlay:hover {
       background: rgba(255,92,43,.3);
       box-shadow: 0 0 24px rgba(255,92,43,.3);
       transform: translate(-50%, -50%) scale(1.05);
     }
+
+    /* small "add more" chip, shown instead of the big dashed zone once
+       at least one clip exists */
+    #add-more-btn {
+      position: absolute;
+      top: 10px; right: 10px;
+      z-index: 6;
+      padding: 6px 12px;
+      font-size: 10px; letter-spacing: 2px;
+      color: rgba(255,92,43,.85);
+      background: rgba(6,6,10,.6);
+      border: 1px solid rgba(255,92,43,.35);
+      border-radius: 999px;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      transition: all .2s ease;
+      display: none;
+    }
+    #add-more-btn:hover {
+      background: rgba(255,92,43,.15);
+      border-color: rgba(255,92,43,.55);
+    }
+    #add-more-btn.show { display: inline-block; }
     .play-triangle {
       width: 0; height: 0;
       border-left: 18px solid var(--accent);
@@ -583,9 +578,44 @@
     .tl-clip:hover { filter: brightness(1.2); }
 
     .tl-clip.video {
-      left: 0; width: 75%;
       background: linear-gradient(90deg, rgba(255,92,43,.25), rgba(255,92,43,.12));
       border: 1px solid rgba(255,92,43,.2);
+      overflow: hidden;
+      white-space: nowrap; text-overflow: ellipsis;
+    }
+    .tl-clip.video.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 10px rgba(255,92,43,.35);
+      color: #fff;
+    }
+    .tl-clip.video .clip-del {
+      margin-left: 6px;
+      font-size: 11px;
+      color: rgba(255,255,255,.55);
+      cursor: pointer;
+      padding: 0 4px;
+      border-radius: 3px;
+    }
+    .tl-clip.video .clip-del:hover {
+      color: #fff;
+      background: rgba(255,92,43,.35);
+    }
+    .tl-empty-hint {
+      width: 100%;
+      text-align: center;
+      font-size: 9px; letter-spacing: 2px;
+      color: rgba(255,255,255,.22);
+      padding-top: 10px;
+    }
+    .option-note {
+      margin-top: 12px;
+      padding: 10px 12px;
+      font-size: 11px;
+      line-height: 1.5;
+      color: rgba(255,255,255,.35);
+      background: rgba(255,255,255,.02);
+      border: 1px solid rgba(255,255,255,.05);
+      border-radius: 6px;
     }
     .tl-clip.caption {
       left: 5%; width: 65%;
@@ -650,6 +680,15 @@
     @keyframes proc-pulse {
       0%,100% { opacity: .5; }
       50% { opacity: 1; }
+    }
+    .process-stage-msg {
+      font-size: 12px;
+      color: rgba(255,255,255,.45);
+      max-width: 640px;
+      text-align: center;
+      padding: 0 24px;
+      min-height: 1.4em;
+      font-family: 'Consolas', 'Courier New', monospace;
     }
 
     .process-bar-wrap {
@@ -729,7 +768,8 @@
 <!-- processing overlay -->
 <div id="process-overlay">
   <div class="process-ring"></div>
-  <div class="process-text">P R O C E S S I N G</div>
+  <div class="process-text" id="process-text">P R O C E S S I N G</div>
+  <div class="process-stage-msg" id="process-stage-msg"></div>
   <div class="process-bar-wrap">
     <div class="process-bar-fill" id="process-fill"></div>
   </div>
@@ -761,6 +801,7 @@
       <div id="video-frame">
         <input type="file" id="file-input" accept="video/*" multiple
           style="display:none">
+        <button id="add-more-btn" title="Add another clip">+ ADD CLIP</button>
         <div id="upload-zone">
           <div class="upload-diamond">
             <span class="upload-diamond-inner">◈</span>
@@ -770,13 +811,9 @@
         </div>
 
         <div id="preview-content">
-          <div class="preview-gradient"></div>
-          <div class="fake-caption">This will change everything...</div>
+          <video id="preview-video" playsinline preload="metadata"></video>
           <div class="play-btn-overlay" id="play-btn">
             <div class="play-triangle"></div>
-          </div>
-          <div class="fake-progress-bar">
-            <div class="fake-progress-fill" id="progress-fill"></div>
           </div>
         </div>
       </div>
@@ -834,44 +871,32 @@
         <!-- CAPTIONS SECTION -->
         <div class="panel-section" data-section="captions">
           <div class="caption-style-grid">
-            <div class="caption-style active">
+            <div class="caption-style active" data-style="impact">
               <div class="caption-preview" style="color:#fff;text-shadow:0 2px 4px rgba(0,0,0,.8)">Bold</div>
               <div class="caption-label">IMPACT</div>
             </div>
-            <div class="caption-style">
+            <div class="caption-style" data-style="glow">
               <div class="caption-preview" style="color:#ff5c2b;font-family:monospace">Neon</div>
               <div class="caption-label">GLOW</div>
             </div>
-            <div class="caption-style">
+            <div class="caption-style" data-style="minimal">
               <div class="caption-preview" style="font-size:12px;font-weight:400;color:rgba(255,255,255,.7)">Clean</div>
               <div class="caption-label">MINIMAL</div>
             </div>
-            <div class="caption-style">
+            <div class="caption-style" data-style="viral">
               <div class="caption-preview" style="color:#ffe600;font-weight:900;letter-spacing:2px">POP</div>
               <div class="caption-label">VIRAL</div>
             </div>
           </div>
-          <div class="option-row">
-            <span class="option-label">Position</span>
-            <span class="option-value">BOTTOM</span>
-          </div>
-          <div class="option-row">
-            <span class="option-label">Word Highlight</span>
-            <span class="option-value">ON</span>
-          </div>
-          <div class="option-row">
-            <span class="option-label">Font Size</span>
-            <span class="option-value">LARGE</span>
-          </div>
-          <div class="option-row">
-            <span class="option-label">Language</span>
-            <span class="option-value">AUTO-DETECT</span>
+          <div class="option-note">
+            Position, font size, and language are auto-selected by the AI
+            based on your chosen style.
           </div>
         </div>
 
         <!-- MUSIC SECTION -->
         <div class="panel-section" data-section="music">
-          <div class="music-track active">
+          <div class="music-track active" data-track="viral-energy">
             <div class="track-icon">♪</div>
             <div class="track-info">
               <div class="track-name">Viral Energy</div>
@@ -879,7 +904,7 @@
             </div>
             <span class="track-dur">0:32</span>
           </div>
-          <div class="music-track">
+          <div class="music-track" data-track="dark-ambient">
             <div class="track-icon">♪</div>
             <div class="track-info">
               <div class="track-name">Dark Ambient</div>
@@ -887,7 +912,7 @@
             </div>
             <span class="track-dur">0:45</span>
           </div>
-          <div class="music-track">
+          <div class="music-track" data-track="lofi-chill">
             <div class="track-icon">♪</div>
             <div class="track-info">
               <div class="track-name">Lo-Fi Chill</div>
@@ -895,7 +920,7 @@
             </div>
             <span class="track-dur">0:38</span>
           </div>
-          <div class="music-track">
+          <div class="music-track" data-track="hype-drop">
             <div class="track-icon">♪</div>
             <div class="track-info">
               <div class="track-name">Hype Drop</div>
@@ -903,7 +928,7 @@
             </div>
             <span class="track-dur">0:28</span>
           </div>
-          <div class="music-track">
+          <div class="music-track" data-track="acoustic-feel">
             <div class="track-icon">♪</div>
             <div class="track-info">
               <div class="track-name">Acoustic Feel</div>
@@ -911,7 +936,7 @@
             </div>
             <span class="track-dur">0:50</span>
           </div>
-          <div class="music-track">
+          <div class="music-track" data-track="">
             <div class="track-icon">♪</div>
             <div class="track-info">
               <div class="track-name">No Music</div>
@@ -923,19 +948,19 @@
 
         <!-- EXPORT SECTION -->
         <div class="panel-section" data-section="export">
-          <div class="export-option active">
+          <div class="export-option active" data-format="tiktok">
             <div class="export-name">TikTok / Reels</div>
             <div class="export-desc">9:16 vertical, optimized for mobile feeds</div>
           </div>
-          <div class="export-option">
+          <div class="export-option" data-format="youtube">
             <div class="export-name">YouTube Shorts</div>
             <div class="export-desc">9:16 vertical, YouTube-optimized encoding</div>
           </div>
-          <div class="export-option">
+          <div class="export-option" data-format="landscape">
             <div class="export-name">Landscape</div>
             <div class="export-desc">16:9 widescreen, YouTube / Twitter</div>
           </div>
-          <div class="export-option">
+          <div class="export-option" data-format="square">
             <div class="export-name">Square</div>
             <div class="export-desc">1:1 ratio, Instagram feed / LinkedIn</div>
           </div>
@@ -952,19 +977,16 @@
     <div class="tl-toolbar">
       <span class="tl-time" id="tl-time">00:00.00 / 00:45.00</span>
       <div class="tl-controls">
-        <button class="tl-ctrl-btn" title="Skip back">⏮</button>
+        <button class="tl-ctrl-btn" id="tl-skip-back"    title="Back 5s">⏮</button>
         <button class="tl-ctrl-btn active" id="tl-play" title="Play">▶</button>
-        <button class="tl-ctrl-btn" title="Skip forward">⏭</button>
-        <button class="tl-ctrl-btn" title="Split">✂</button>
-        <button class="tl-ctrl-btn" title="Undo">↩</button>
+        <button class="tl-ctrl-btn" id="tl-skip-forward" title="Forward 5s">⏭</button>
       </div>
       <span class="tl-zoom">100%</span>
     </div>
     <div class="tl-tracks">
       <div class="tl-track">
         <span class="tl-track-label">VIDEO</span>
-        <div class="tl-track-bar">
-          <div class="tl-clip video">clip_01.mp4</div>
+        <div class="tl-track-bar" id="tl-video-track">
           <div class="tl-playhead" id="tl-playhead"></div>
         </div>
       </div>
@@ -977,7 +999,7 @@
       <div class="tl-track">
         <span class="tl-track-label">AUDIO</span>
         <div class="tl-track-bar">
-          <div class="tl-clip audio">♪ Viral Energy</div>
+          <div class="tl-clip audio" id="tl-audio-clip">♪ Viral Energy</div>
         </div>
       </div>
     </div>
@@ -1003,97 +1025,204 @@ setTimeout(() => triEnter.classList.add('done'), 1300);
 setTimeout(() => { workspace.classList.add('on'); spawnParticles(); }, 1600);
 
 /* ═══════════════════════════════════════════════
-   UPLOAD ZONE → REAL FILE UPLOAD
+   UPLOAD + CLIP MANAGEMENT
 ═══════════════════════════════════════════════ */
-const uploadZone = document.getElementById('upload-zone');
-const fileInput = document.getElementById('file-input');
+const uploadZone     = document.getElementById('upload-zone');
+const fileInput      = document.getElementById('file-input');
 const previewContent = document.getElementById('preview-content');
 const processOverlay = document.getElementById('process-overlay');
-const processFill = document.getElementById('process-fill');
+const processFill    = document.getElementById('process-fill');
+const addMoreBtn     = document.getElementById('add-more-btn');
+const previewVideo   = document.getElementById('preview-video');
+const playBtnOverlay = document.getElementById('play-btn');
+const videoTrack     = document.getElementById('tl-video-track');
+const playhead       = document.getElementById('tl-playhead');
+const tlTimeEl       = document.getElementById('tl-time');
+const tlPlayBtn      = document.getElementById('tl-play');
 
-// Click upload zone → open file picker
+let currentClips = [];
+let selectedClipId = null;
+
+/** Fetch the project's clip list, rebuild the timeline and preview. */
+async function refreshClips() {
+  try {
+    currentClips = await API.getClips() || [];
+  } catch (err) {
+    console.error('Failed to list clips:', err);
+    currentClips = [];
+  }
+  renderTimelineClips();
+  if (currentClips.length === 0) {
+    uploadZone.classList.remove('hidden');
+    addMoreBtn.classList.remove('show');
+    previewContent.classList.remove('show');
+    previewVideo.removeAttribute('src');
+    previewVideo.load();
+    selectedClipId = null;
+    return;
+  }
+  uploadZone.classList.add('hidden');
+  addMoreBtn.classList.add('show');
+  previewContent.classList.add('show');
+  // Keep the current selection if it still exists, otherwise pick the first.
+  const stillHere = currentClips.find(c => c.id === selectedClipId);
+  selectClip((stillHere || currentClips[0]).id);
+}
+
+function clipSrc(clip) {
+  // uploads/clips/<projectId>/<filename-on-disk>
+  const diskName = (clip.filepath || '').replace(/\\/g, '/').split('/').pop();
+  return `/uploads/clips/${API.projectId}/${encodeURIComponent(diskName)}`;
+}
+
+function renderTimelineClips() {
+  // Nuke existing video chips but keep the playhead.
+  videoTrack.querySelectorAll('.tl-clip.video, .tl-empty-hint').forEach(el => el.remove());
+  if (currentClips.length === 0) {
+    const hint = document.createElement('div');
+    hint.className = 'tl-empty-hint';
+    hint.textContent = 'NO CLIPS YET';
+    videoTrack.appendChild(hint);
+    return;
+  }
+  // Split track width evenly across clips (client-side durations are
+  // unknown without probing, so equal-width chips are a reasonable default).
+  const slice = 100 / currentClips.length;
+  currentClips.forEach((clip, i) => {
+    const el = document.createElement('div');
+    el.className = 'tl-clip video' + (clip.id === selectedClipId ? ' selected' : '');
+    el.style.left  = (i * slice) + '%';
+    el.style.width = 'calc(' + slice + '% - 4px)';
+    el.title = clip.filename;
+    el.innerHTML =
+      '<span class="clip-name"></span>' +
+      '<span class="clip-del" title="Delete this clip">×</span>';
+    el.querySelector('.clip-name').textContent = clip.filename;
+    el.addEventListener('click', (ev) => {
+      if (ev.target.classList.contains('clip-del')) return;
+      selectClip(clip.id);
+    });
+    el.querySelector('.clip-del').addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      if (!confirm(`Delete "${clip.filename}"?`)) return;
+      try {
+        await API.deleteClip(clip.id);
+        if (selectedClipId === clip.id) selectedClipId = null;
+        await refreshClips();
+      } catch (err) {
+        console.error('Delete failed:', err);
+        alert('Failed to delete clip.');
+      }
+    });
+    videoTrack.appendChild(el);
+  });
+}
+
+function selectClip(id) {
+  const clip = currentClips.find(c => c.id === id);
+  if (!clip) return;
+  selectedClipId = id;
+  const src = clipSrc(clip);
+  if (previewVideo.getAttribute('src') !== src) {
+    previewVideo.pause();
+    previewVideo.src = src;
+    previewVideo.load();
+  }
+  renderTimelineClips();
+  playBtnOverlay.classList.remove('hidden');
+}
+
+// Upload flow — works for both the first-time zone and the "add more" chip.
 uploadZone.addEventListener('click', () => fileInput.click());
+addMoreBtn.addEventListener('click', (ev) => { ev.stopPropagation(); fileInput.click(); });
 
-// When files selected → upload via API
 fileInput.addEventListener('change', async () => {
   const files = fileInput.files;
   if (!files.length) return;
 
-  uploadZone.classList.add('hidden');
   processOverlay.classList.add('on');
+  document.getElementById('process-text').textContent = 'U P L O A D I N G';
+  document.getElementById('process-stage-msg').textContent = '';
   processFill.style.width = '0%';
 
   try {
     await API.uploadClips(Array.from(files), (pct) => {
       processFill.style.width = pct + '%';
     });
-
     processFill.style.width = '100%';
+    await refreshClips();
+  } catch (err) {
+    console.error('Upload error:', err);
+    let msg = 'Upload failed.';
+    try { msg = JSON.parse(err.message).error || msg; } catch (_) { msg = String(err.message || err); }
+    alert('Upload failed: ' + msg);
+  } finally {
     setTimeout(() => {
       processOverlay.classList.remove('on');
       processFill.style.width = '0%';
-      previewContent.classList.add('show');
-
-      // Update timeline with uploaded clip names
-      const videoClip = document.querySelector('.tl-clip.video');
-      if (videoClip) videoClip.textContent = files[0].name;
-    }, 500);
-  } catch (err) {
-    console.error('Upload error:', err);
-    processOverlay.classList.remove('on');
-    uploadZone.classList.remove('hidden');
-    alert('Upload failed. Please try again.');
+    }, 400);
+    fileInput.value = '';
   }
+});
 
-  fileInput.value = '';
+// Hydrate on load — restores clips from a prior session.
+document.addEventListener('DOMContentLoaded', async () => {
+  await new Promise(r => setTimeout(r, 200));   // let API.init() finish
+  if (API.projectId) await refreshClips();
 });
 
 /* ═══════════════════════════════════════════════
-   PLAY BUTTON
+   PLAYBACK — real <video> element
 ═══════════════════════════════════════════════ */
-let isPlaying = false;
-let playInterval;
+function fmt(sec) {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  const m = Math.floor(sec / 60);
+  const s = sec - m * 60;
+  return `${String(m).padStart(2,'0')}:${s.toFixed(2).padStart(5,'0')}`;
+}
 
-document.getElementById('play-btn').addEventListener('click', () => {
-  togglePlay();
-});
+function updateTimelineFromVideo() {
+  const dur = previewVideo.duration || 0;
+  const cur = previewVideo.currentTime || 0;
+  tlTimeEl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
+  // Position playhead across the selected clip's portion of the track.
+  const idx = currentClips.findIndex(c => c.id === selectedClipId);
+  if (idx < 0 || currentClips.length === 0 || !dur) return;
+  const slice = 100 / currentClips.length;
+  const localPct = cur / dur;
+  playhead.style.left = (idx * slice + localPct * slice) + '%';
+}
 
-document.getElementById('tl-play').addEventListener('click', () => {
-  if (!previewContent.classList.contains('show')) {
-    uploadZone.click();
-    return;
+previewVideo.addEventListener('timeupdate', updateTimelineFromVideo);
+previewVideo.addEventListener('loadedmetadata', updateTimelineFromVideo);
+previewVideo.addEventListener('play',  () => { tlPlayBtn.textContent = '⏸'; playBtnOverlay.classList.add('hidden'); });
+previewVideo.addEventListener('pause', () => { tlPlayBtn.textContent = '▶'; playBtnOverlay.classList.remove('hidden'); });
+previewVideo.addEventListener('ended', () => {
+  // Hop to the next clip if any, otherwise stop.
+  const idx = currentClips.findIndex(c => c.id === selectedClipId);
+  if (idx >= 0 && idx < currentClips.length - 1) {
+    selectClip(currentClips[idx + 1].id);
+    previewVideo.play().catch(() => { /* autoplay policy */ });
   }
-  togglePlay();
 });
 
 function togglePlay() {
-  isPlaying = !isPlaying;
-  const playBtn = document.getElementById('tl-play');
-  const progressFill = document.getElementById('progress-fill');
-  const playhead = document.getElementById('tl-playhead');
-
-  if (isPlaying) {
-    playBtn.textContent = '⏸';
-    progressFill.style.transition = 'width 30s linear';
-    progressFill.style.width = '100%';
-
-    let pos = parseFloat(playhead.style.left) || 35;
-    playInterval = setInterval(() => {
-      pos += 0.2;
-      if (pos > 95) pos = 0;
-      playhead.style.left = pos + '%';
-
-      // update time display
-      const sec = (pos / 100 * 45).toFixed(2);
-      document.getElementById('tl-time').textContent =
-        `00:${String(Math.floor(sec)).padStart(2,'0')}.${(sec % 1).toFixed(2).slice(2)} / 00:45.00`;
-    }, 100);
-  } else {
-    playBtn.textContent = '▶';
-    progressFill.style.transition = 'none';
-    clearInterval(playInterval);
-  }
+  if (!currentClips.length) { fileInput.click(); return; }
+  if (previewVideo.paused) previewVideo.play().catch(e => console.warn('play:', e));
+  else previewVideo.pause();
 }
+playBtnOverlay.addEventListener('click', togglePlay);
+tlPlayBtn.addEventListener('click', togglePlay);
+
+document.getElementById('tl-skip-back').addEventListener('click', () => {
+  if (!currentClips.length) return;
+  previewVideo.currentTime = Math.max(0, previewVideo.currentTime - 5);
+});
+document.getElementById('tl-skip-forward').addEventListener('click', () => {
+  if (!currentClips.length) return;
+  const dur = previewVideo.duration || 0;
+  previewVideo.currentTime = Math.min(dur - 0.1, previewVideo.currentTime + 5);
+});
 
 /* ═══════════════════════════════════════════════
    SIDE PANEL TABS
@@ -1133,9 +1262,8 @@ document.querySelectorAll('.music-track').forEach(track => {
   track.addEventListener('click', () => {
     document.querySelectorAll('.music-track').forEach(t => t.classList.remove('active'));
     track.classList.add('active');
-    // update timeline audio clip label
     const name = track.querySelector('.track-name').textContent;
-    const audioClip = document.querySelector('.tl-clip.audio');
+    const audioClip = document.getElementById('tl-audio-clip');
     if (audioClip) audioClip.textContent = name === 'No Music' ? '(none)' : '♪ ' + name;
   });
 });
@@ -1150,17 +1278,101 @@ document.querySelectorAll('.export-option').forEach(opt => {
   });
 });
 
-document.getElementById('export-btn').addEventListener('click', () => {
+/* ═══════════════════════════════════════════════
+   EXPORT → KICK OFF REAL EDIT JOB
+═══════════════════════════════════════════════ */
+const STAGE_LABELS = {
+  concat:    'Stitching clips together',
+  asr:       'Transcribing audio',
+  planning:  'Planning shots with AI',
+  editing:   'Selecting best takes',
+  rendering: 'Rendering final video',
+  done:      'Ready to download',
+  error:     'Something went wrong',
+};
+
+function collectExportConfig() {
+  const enhance = {};
+  document.querySelectorAll('.enhance-card').forEach(card => {
+    enhance[card.dataset.feature] = card.classList.contains('active');
+  });
+  const captionEl = document.querySelector('.caption-style.active');
+  const musicEl   = document.querySelector('.music-track.active');
+  const exportEl  = document.querySelector('.export-option.active');
+  return {
+    enhance,
+    captionStyle: captionEl ? captionEl.dataset.style : undefined,
+    music:        musicEl   ? musicEl.dataset.track   : '',
+    exportFormat: exportEl  ? exportEl.dataset.format : 'tiktok',
+  };
+}
+
+document.getElementById('export-btn').addEventListener('click', async () => {
   const btn = document.getElementById('export-btn');
+  const processText  = document.getElementById('process-text');
+  const processStage = document.getElementById('process-stage-msg');
+
+  if (!previewContent.classList.contains('show')) {
+    alert('Upload at least one clip first.');
+    return;
+  }
+
   btn.textContent = 'EXPORTING...';
   btn.style.opacity = '.6';
-  setTimeout(() => {
-    btn.textContent = 'EXPORTED ✓';
+  processOverlay.classList.add('on');
+  processFill.style.width = '0%';
+  processText.textContent = 'S T A R T I N G';
+  processStage.textContent = '';
+
+  try {
+    const config = collectExportConfig();
+    const job = await API.startEditJob(config);
+    if (!job || !job.id) throw new Error(job && job.error ? job.error : 'Failed to start job');
+
+    // Poll every 800 ms for up to ~30 min.
+    const deadline = Date.now() + 30 * 60 * 1000;
+    let current = job;
+    while (Date.now() < deadline) {
+      if (current.status === 'done')  break;
+      if (current.status === 'error') throw new Error(current.error_msg || 'Processing failed');
+
+      const pct = Math.max(0, Math.min(100, Number(current.progress) || 0));
+      processFill.style.width = pct + '%';
+      const stage = current.stage || 'processing';
+      processText.textContent = (STAGE_LABELS[stage] || stage).toUpperCase().split('').join(' ');
+      processStage.textContent = current.stage_msg ? `${pct}%  ${current.stage_msg}` : `${pct}%`;
+
+      await new Promise(r => setTimeout(r, 800));
+      current = await API.getEditJob(job.id);
+    }
+
+    if (current.status !== 'done') throw new Error('Timed out waiting for render');
+
+    processFill.style.width = '100%';
+    processText.textContent = 'R E A D Y';
+    processStage.textContent = 'Starting download…';
+
+    const link = document.createElement('a');
+    link.href = API.getDownloadUrl(current.id);
+    link.download = `vshort-${current.id.slice(0, 6)}.mp4`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
     setTimeout(() => {
-      btn.textContent = 'EXPORT VIDEO →';
+      processOverlay.classList.remove('on');
+      btn.textContent = 'EXPORTED ✓';
       btn.style.opacity = '';
-    }, 1500);
-  }, 2500);
+      setTimeout(() => { btn.textContent = 'EXPORT VIDEO →'; }, 1500);
+    }, 800);
+  } catch (err) {
+    console.error('Export failed:', err);
+    processText.textContent = 'E R R O R';
+    processStage.textContent = String(err.message || err).slice(0, 200);
+    btn.textContent = 'RETRY';
+    btn.style.opacity = '';
+    setTimeout(() => { processOverlay.classList.remove('on'); }, 3000);
+  }
 });
 
 /* ═══════════════════════════════════════════════

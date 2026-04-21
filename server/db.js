@@ -84,6 +84,8 @@ db.exec(`
     config      TEXT NOT NULL,
     status      TEXT NOT NULL DEFAULT 'pending',
     progress    INTEGER DEFAULT 0,
+    stage       TEXT,
+    stage_msg   TEXT,
     output_path TEXT,
     error_msg   TEXT,
     created_at  TEXT NOT NULL DEFAULT (datetime('now')),
@@ -100,5 +102,12 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_subs_stripe       ON subscriptions(stripe_sub_id);
   CREATE INDEX IF NOT EXISTS idx_users_stripe      ON users(stripe_customer_id);
 `);
+
+// ─── Idempotent migrations ──────────────────────────────────────────────
+// better-sqlite3's CREATE TABLE IF NOT EXISTS won't add columns to an
+// existing table. Probe PRAGMA table_info and ALTER when a column is missing.
+const editJobsCols = new Set(db.prepare(`PRAGMA table_info(edit_jobs)`).all().map(c => c.name));
+if (!editJobsCols.has('stage'))     db.exec(`ALTER TABLE edit_jobs ADD COLUMN stage     TEXT`);
+if (!editJobsCols.has('stage_msg')) db.exec(`ALTER TABLE edit_jobs ADD COLUMN stage_msg TEXT`);
 
 module.exports = db;

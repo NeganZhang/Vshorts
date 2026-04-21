@@ -4,3 +4,12 @@ data/
 .env
 .env.local
 .env.*.local
+
+# ─── Python venv (CutClaw bridge) ─────────────────────────────────
+server/python/.venv/
+server/python/__pycache__/
+server/python/**/__pycache__/
+
+# ─── Vendored CutClaw (licensing pending — see VENDORED.md) ──────
+# Uncomment to exclude until upstream LICENSE is resolved:
+# server/python/cutclaw/

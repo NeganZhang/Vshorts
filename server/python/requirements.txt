@@ -1,0 +1,47 @@
+# Python deps for the VSHORT ↔ CutClaw bridge.
+# Mirrors server/python/cutclaw/requirements.txt with pins loosened only where
+# our wrapper needs extras. Install via server/python/setup.ps1 (or setup.sh).
+
+# CutClaw core pipeline
+numpy
+torch==2.8.0
+decord==0.6.0
+scenedetect==0.6.7.1
+av
+Pillow
+tqdm
+litellm
+pydantic
+sentence-transformers
+scikit-learn
+opencv-python-headless
+
+# Audio pipeline
+soundfile
+scipy
+audioread
+# madmom is installed in a separate --no-build-isolation step by setup.ps1
+# because its setup.py imports Cython before pip can wire build deps.
+#
+# aubio is intentionally omitted — it has no Windows wheels and building
+# from source requires libaubio + ffmpeg dev headers. CutClaw only imports
+# it lazily inside the pitch/mel detection methods; the default beat/onset
+# methods via madmom work fine without it. Install manually if you need
+# pitch analysis:  pip install aubio  (requires a C toolchain).
+python-dotenv
+tenacity
+
+# ASR backends (CutClaw uses pywhispercpp; we also keep faster-whisper as a
+# lighter fallback for our thin wrapper when the user hasn't supplied an SRT).
+pywhispercpp
+pyannote.audio
+faster-whisper
+
+# Misc helpers referenced from src/utils and src/audio
+requests
+packaging
+torchvision
+qwen-omni-utils
+einops
+ffmpeg-python
+matplotlib
