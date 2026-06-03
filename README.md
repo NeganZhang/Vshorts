@@ -1,57 +1,88 @@
 # VSHORT
 
-AI-assisted short-form video workflow: script → storyboard → video editor.
-Node.js/Express backend, vanilla HTML/CSS/JS frontend, Supabase auth, SQLite.
+AI-assisted short-form video workflow: script -> storyboard -> video editor.
+Node.js/Express backend, vanilla HTML/CSS/JS frontend, Supabase auth, SQLite,
+FFmpeg media processing, and HyperFrames rendering.
 
 ## Prerequisites
 
-1. **Node.js 18+** — `npm install`
-2. **Python 3.12** — on PATH (`py -3.12 --version` on Windows, `python3.12 --version` elsewhere)
-3. **FFmpeg** — on PATH (`ffmpeg -version`)
-4. Optional: **CUDA toolkit** for GPU-accelerated video decoding
+1. Node.js 22+ (`node -v`)
+2. FFmpeg + FFprobe on PATH (`ffmpeg -version`, `ffprobe -version`)
+3. Supabase project keys for auth
+4. Optional: Chrome path via `HYPERFRAMES_BROWSER_PATH` when HyperFrames cannot find a browser automatically
 
-## First-time setup
+## First-Time Setup
 
 ```bash
-# Node deps
 npm install
-
-# Python venv + CutClaw pipeline deps (takes a few minutes)
-# Windows:
-pwsh server/python/setup.ps1
-# macOS / Linux:
-bash server/python/setup.sh
+copy .env.example .env
+npm run dev
 ```
 
-Copy `.env.example` → `.env` and fill in at least `ANTHROPIC_API_KEY`.
+Fill `.env` with at least:
+
+```env
+SUPABASE_URL=...
+SUPABASE_PUBLISHABLE_KEY=...
+```
+
+For production-style signup with server-side auto-confirmed users, also add:
+
+```env
+SUPABASE_SERVICE_ROLE_KEY=...
+```
 
 ## Run
 
 ```bash
-npm run dev    # http://localhost:3000
+npm run dev
 ```
 
-## The VSHORT video editor (`/vshorts.html`)
+Open:
 
-The editor takes one or more uploaded clips and produces an AI-assembled
-short-form video. Under the hood:
+```text
+http://localhost:3000
+http://localhost:3000/scripts.html
+http://localhost:3000/storyboard.html
+http://localhost:3000/vshorts.html
+```
 
-1. Uploaded clips are concatenated into a single source video (`ffmpegConcat`).
-2. The concatenated video is handed to the [CutClaw](https://github.com/GVCLab/CutClaw)
-   pipeline (vendored under `server/python/cutclaw/`), which:
-   - transcribes audio with faster-whisper (or supplied SRT),
-   - runs a multi-agent screenwriter + editor to plan shots,
-   - renders the final montage with FFmpeg.
-3. Progress streams back to the browser via `edit_jobs.stage` / `stage_msg`.
+## The VSHORT Video Editor
 
-### Music presets
+The editor takes one or more uploaded clips and produces a short-form video.
+The current export pipeline is:
 
-Drop royalty-free MP3s in `server/assets/music/` matching the preset ids in
-`public/vshorts.html`. See `server/assets/music/README.md` for the full list.
-If no preset matches, the source video's own audio is used.
+1. Uploaded clips are stitched into one source video with FFmpeg.
+2. Talking-head pauses are detected from audio with FFmpeg `silencedetect`.
+3. Long pauses are removed while keeping a small natural audio buffer.
+4. The cleaned source is normalized to browser-playable H.264/AAC MP4.
+5. HyperFrames generates the motion package, branded overlays, BGM, and final vertical export.
+6. Progress streams back through `edit_jobs.stage` and `edit_jobs.stage_msg`.
 
-### Licensing note
+Default pause-cut behavior:
 
-CutClaw is currently vendored without a license file upstream. See
-`server/python/cutclaw/VENDORED.md` — **do not ship to production** until the
-license situation is resolved.
+- `minSilenceSeconds`: `0.45`
+- `silenceThresholdDb`: `-36`
+- `silencePaddingSeconds`: `0.11`
+
+These can be overridden in the edit job config. Set `autoCutPauses: false` to disable pause cutting.
+
+## Music Presets
+
+Drop royalty-free audio files into `server/assets/music/` using preset ids from
+`public/vshorts.html`, for example:
+
+```text
+server/assets/music/viral-energy.mp3
+server/assets/music/dark-ambient.mp3
+server/assets/music/lofi-chill.mp3
+```
+
+If a preset is selected but the file is missing, the backend generates a simple
+fallback beat so the export still completes locally.
+
+## Notes
+
+- The original frontend pages are preserved: `scripts.html`, `storyboard.html`, and `vshorts.html`.
+- The old CutClaw bridge remains in the repository as legacy code, but the active export path no longer calls it.
+- Generated uploads, SQLite data, local env files, and local logs are gitignored.

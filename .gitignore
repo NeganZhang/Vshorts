@@ -1,9 +1,12 @@
 node_modules/
 uploads/
 data/
+outputs/
 .env
 .env.local
 .env.*.local
+*.out.log
+*.err.log
 
 # ─── Python venv (CutClaw bridge) ─────────────────────────────────
 server/python/.venv/

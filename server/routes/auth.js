@@ -5,9 +5,10 @@ const { authRequired } = require('../middleware/auth');
 
 const router = Router();
 
-// ─── Supabase Admin Client (service_role key — server only) ──
+// Supabase Admin Client (service_role key, server only).
 const supabaseUrl = process.env.SUPABASE_URL || 'https://seolaotjqmyrtujehbfo.supabase.co';
 const serviceKey  = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const anonKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
 
 let supabaseAdmin = null;
 if (serviceKey) {
@@ -16,7 +17,15 @@ if (serviceKey) {
   });
 }
 
-// ─── Rate limiting ─────────────────────────────
+function createAnonClient(res) {
+  if (!anonKey) {
+    res.status(503).json({ error: 'Supabase publishable key not configured' });
+    return null;
+  }
+  return createClient(supabaseUrl, anonKey);
+}
+
+// Rate limiting.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30,
@@ -27,7 +36,7 @@ const authLimiter = rateLimit({
 
 router.use(authLimiter);
 
-// ─── Validation ────────────────────────────────
+// Validation.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function validateEmail(email) {
@@ -73,12 +82,8 @@ function sanitizeSex(v) {
   return SEX_VALUES.includes(s) ? s : null;
 }
 
-// ─── Register (via Supabase Admin — no email, auto-confirmed) ──
+// Register via Supabase. Admin mode auto-confirms when service_role is set.
 router.post('/register', async (req, res) => {
-  if (!supabaseAdmin) {
-    return res.status(503).json({ error: 'Supabase not configured — add SUPABASE_SERVICE_ROLE_KEY to .env' });
-  }
-
   try {
     const { email, password, nickname, birthday, sex, disclaimerAccepted } = req.body;
 
@@ -98,52 +103,63 @@ router.post('/register', async (req, res) => {
     const cleanSex     = sanitizeSex(sex);
     const acceptedAt   = new Date().toISOString();
 
-    // Create user via Admin API — auto-confirmed, no email sent.
-    // Profile fields are passed as user_metadata so the handle_new_user()
-    // DB trigger can copy them into public.profiles atomically.
-    const { data, error } = await supabaseAdmin.auth.admin.createUser({
-      email: cleanEmail,
-      password,
-      email_confirm: true,
-      user_metadata: {
-        nickname: cleanNick || undefined,
-        birthday: cleanBirth || undefined,
-        sex:      cleanSex  || undefined,
-        disclaimer_accepted_at: acceptedAt,
-      },
-    });
+    const userMetadata = {
+      nickname: cleanNick || undefined,
+      birthday: cleanBirth || undefined,
+      sex:      cleanSex  || undefined,
+      disclaimer_accepted_at: acceptedAt,
+    };
 
-    if (error) {
-      if (error.message.includes('already been registered')) {
-        return res.status(409).json({ error: 'Email already registered' });
+    const anonClient = createAnonClient(res);
+    if (!anonClient) return;
+    let session;
+
+    if (supabaseAdmin) {
+      const { error } = await supabaseAdmin.auth.admin.createUser({
+        email: cleanEmail,
+        password,
+        email_confirm: true,
+        user_metadata: userMetadata,
+      });
+
+      if (error) {
+        if (error.message.includes('already been registered')) {
+          return res.status(409).json({ error: 'Email already registered' });
+        }
+        return res.status(400).json({ error: error.message });
       }
-      return res.status(400).json({ error: error.message });
+    } else {
+      const { data: signUpData, error: signUpErr } = await anonClient.auth.signUp({
+        email: cleanEmail,
+        password,
+        options: { data: userMetadata },
+      });
+      if (signUpErr) {
+        if (signUpErr.message.includes('already registered')) {
+          return res.status(409).json({ error: 'Email already registered' });
+        }
+        return res.status(400).json({ error: signUpErr.message });
+      }
+      session = signUpData;
     }
 
-    // Now sign them in to get a session token
-    const { data: signInData, error: signInErr } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: cleanEmail,
-    });
+    if (!session?.session) {
+      const { data: signInData, error: sessErr } = await anonClient.auth.signInWithPassword({
+        email: cleanEmail,
+        password,
+      });
 
-    // Generate a session by signing in with password
-    // Use a separate anon client for this
-    const anonKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
-    const anonClient = createClient(supabaseUrl, anonKey);
-    const { data: session, error: sessErr } = await anonClient.auth.signInWithPassword({
-      email: cleanEmail,
-      password,
-    });
-
-    if (sessErr) {
-      console.error('Sign-in after register error:', sessErr);
-      return res.status(500).json({ error: 'Account created but login failed. Try logging in manually.' });
+      if (sessErr) {
+        console.error('Sign-in after register error:', sessErr);
+        return res.status(500).json({ error: 'Account created but login failed. Try logging in manually.' });
+      }
+      session = signInData;
     }
 
-    // Upsert profile row as a safety net — works even when the DB
+    // Upsert profile row as a safety net. This works even when the DB
     // trigger isn't (re)installed yet on existing Supabase projects.
     try {
-      await supabaseAdmin.from('profiles').upsert({
+      await supabaseAdmin?.from('profiles').upsert({
         id:                     session.user.id,
         email:                  cleanEmail,
         nickname:               cleanNick,
@@ -167,12 +183,8 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// ─── Login (via Supabase — returns session tokens) ──
+// Login via Supabase and return session tokens.
 router.post('/login', async (req, res) => {
-  if (!supabaseAdmin) {
-    return res.status(503).json({ error: 'Supabase not configured' });
-  }
-
   try {
     const { email, password } = req.body;
 
@@ -181,8 +193,8 @@ router.post('/login', async (req, res) => {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const anonKey = process.env.SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_ANON_KEY;
-    const anonClient = createClient(supabaseUrl, anonKey);
+    const anonClient = createAnonClient(res);
+    if (!anonClient) return;
 
     const { data, error } = await anonClient.auth.signInWithPassword({
       email: cleanEmail,
@@ -205,7 +217,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// ─── Get current user (auth + profile) ─────────
+// Get current user and profile.
 router.get('/me', authRequired, async (req, res) => {
   if (!supabaseAdmin) {
     return res.json({ id: req.user.id, email: req.user.email });
@@ -228,7 +240,7 @@ router.get('/me', authRequired, async (req, res) => {
   });
 });
 
-// ─── Update profile (nickname / birthday / sex) ─
+// Update profile.
 router.patch('/profile', authRequired, async (req, res) => {
   if (!supabaseAdmin) {
     return res.status(503).json({ error: 'Supabase not configured' });
@@ -274,3 +286,4 @@ router.patch('/profile', authRequired, async (req, res) => {
 });
 
 module.exports = router;
+
