@@ -6,10 +6,10 @@ const { splitScriptIntoScenes } = require('./claude');
 const SHOT_TYPES = ['Wide Shot', 'Medium Shot', 'Close-Up', 'Extreme CU', 'Over Shoulder', 'POV', 'Establishing', 'Low Angle', 'High Angle', 'Dutch Angle'];
 const CAMERA_MOVES = ['Static', 'Pan Left', 'Pan Right', 'Tilt Up', 'Tilt Down', 'Dolly In', 'Dolly Out', 'Tracking', 'Crane', 'Handheld'];
 
-async function buildScenesData(prompt, numScenes) {
+async function buildScenesData(prompt, numScenes, opts = {}) {
   let scenesData = null;
   try {
-    const split = await splitScriptIntoScenes(prompt, numScenes);
+    const split = await splitScriptIntoScenes(prompt, numScenes, { hasReference: !!opts.hasReference });
     if (Array.isArray(split) && split.length === numScenes) scenesData = split;
   } catch (e) { console.warn('[sceneSplit] splitter threw:', e.message); }
 

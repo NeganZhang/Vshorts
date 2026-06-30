@@ -271,7 +271,16 @@ const SPLIT_CAMERA_MOVES = [
 ];
 const DURATION_RE = /^\d+-\d+s$/;
 
-function buildSplitterPrompt(numScenes, cjk) {
+function buildSplitterPrompt(numScenes, cjk, hasReference) {
+  // When the user supplied a reference image (garment/product), the artist must
+  // NOT invent its appearance — that hallucinated text fights the reference at
+  // image-gen time. Refer to it generically and only vary pose/camera/setting.
+  const consistencyCjk = hasReference
+    ? '【最重要】主角身上的服装/产品来自一张你看不到的参考图。绝对不要编造或描述它的颜色、款式或材质;每个 "prompt" 只用「参考图中的那件服装/产品」(the garment/product from the reference image)来指代,并在所有分镜保持完全一致。你只负责描述姿势、机位、动作、表情和场景,绝不改动或重新设计服装/产品本身。同时保持同一个主角(同一张脸、发型、身材)。'
+    : '【最重要】所有分镜是同一主角/主体、同一画风、构成连贯的故事。每个 "prompt" 都必须重复主角的外观特征(例如「一只灰色虎斑小猫」),并紧扣主题,绝不能出现与主题无关的人或物。先在脑中固定主角的样子,再让它贯穿每一个分镜。';
+  const consistencyEn = hasReference
+    ? 'MOST IMPORTANT: the subject\'s garment/product comes from a REFERENCE IMAGE you cannot see. NEVER invent or describe its color, type, or material. Refer to it ONLY as "the garment/product from the reference image" and keep it identical in every scene. Describe ONLY the pose, camera, action, expression, and setting — never redesign or restyle the clothing/product. Keep the SAME model (same face, hair, body) throughout.'
+    : 'MOST IMPORTANT: all scenes share the SAME subject/characters, the SAME visual style, and form ONE coherent story. EVERY "prompt" must restate the subject\'s key appearance (e.g. "a small grey tabby kitten") and stay strictly on the topic — never introduce unrelated people or objects. Lock the subject\'s look first, then carry it through every scene.';
   const header = cjk
     ? `你是 VSHORT，一名短视频分镜师。把用户提供的剧本切分成正好 ${numScenes} 个画面。
 必须严格输出 JSON（不要任何解释、不要代码块围栏）：
@@ -285,7 +294,7 @@ Output ONLY valid JSON (no markdown fences, no prose), in this shape:
     ? `规则：
 - "scenes" 长度必须 = ${numScenes}，按剧情顺序排列。
 - "prompt" 必须是单个具体可拍摄的视觉描述（无对白、无字幕），≤ 200 字。
-- 【最重要】所有分镜是同一主角/主体、同一画风、构成连贯的故事。每个 "prompt" 都必须重复主角的外观特征（例如「一只灰色虎斑小猫」），并紧扣主题，绝不能出现与主题无关的人或物。先在脑中固定主角的样子，再让它贯穿每一个分镜。
+- ${consistencyCjk}
 - "shot_type" 必须是以下之一：${SPLIT_SHOT_TYPES.join(', ')}
 - "camera_move" 必须是以下之一：${SPLIT_CAMERA_MOVES.join(', ')}
 - "duration" 格式 "Xs-Ys"，全部相加约等于 30-60 秒。
@@ -293,7 +302,7 @@ Output ONLY valid JSON (no markdown fences, no prose), in this shape:
     : `Rules:
 - "scenes" length MUST equal ${numScenes}, in narrative order.
 - "prompt" MUST be one concrete, shootable visual description (no dialogue, no captions), ≤ 200 chars.
-- MOST IMPORTANT: all scenes share the SAME subject/characters, the SAME visual style, and form ONE coherent story. EVERY "prompt" must restate the subject's key appearance (e.g. "a small grey tabby kitten") and stay strictly on the topic — never introduce unrelated people or objects. Lock the subject's look first, then carry it through every scene.
+- ${consistencyEn}
 - "shot_type" MUST be one of: ${SPLIT_SHOT_TYPES.join(', ')}
 - "camera_move" MUST be one of: ${SPLIT_CAMERA_MOVES.join(', ')}
 - "duration" format "Xs-Ys"; durations should sum to roughly 30-60 seconds total.
@@ -358,13 +367,13 @@ async function callClaudeJSON(systemPrompt, userPrompt) {
   return text;
 }
 
-async function splitScriptIntoScenes(script, numScenes) {
+async function splitScriptIntoScenes(script, numScenes, opts = {}) {
   if (!script || !numScenes || numScenes < 1) return null;
   if (!KIMI_API_KEY && !ANTHROPIC_API_KEY) return null;
 
   const n    = Math.max(1, Math.min(20, numScenes | 0));
   const cjk  = hasCJK(script);
-  const sys  = buildSplitterPrompt(n, cjk);
+  const sys  = buildSplitterPrompt(n, cjk, !!opts.hasReference);
 
   let raw;
   try {

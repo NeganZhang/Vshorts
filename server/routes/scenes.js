@@ -104,7 +104,7 @@ router.post('/:projectId/scenes/auto-generate', async (req, res) => {
     const aspect = req.body.aspect || null;
     const referenceImage = req.body.referenceImage || null;
 
-    const scenesData = await buildScenesData(prompt, numScenes);
+    const scenesData = await buildScenesData(prompt, numScenes, { hasReference: !!referenceImage });
 
     await data.scenes.deleteByProject(projectId);
     const rows = scenesData.map((s, i) => ({

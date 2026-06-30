@@ -72,7 +72,7 @@ router.post('/:id/run', authRequired, async (req, res, next) => {
     if (!prompt) return res.status(400).json({ error: 'Template produced an empty prompt' });
 
     const proj = await data.projects.create(req.user.id, tpl.title);
-    const scenesData = await buildScenesData(prompt, numScenes);
+    const scenesData = await buildScenesData(prompt, numScenes, { hasReference: !!referenceImage });
     await data.scenes.deleteByProject(proj.id);
     await data.scenes.insertMany(scenesData.map((s, i) => ({
       project_id: proj.id, sort_order: i, prompt: s.prompt,

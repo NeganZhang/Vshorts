@@ -52,12 +52,15 @@ function mimeFromExt(ext) {
   return { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' }[ext] || 'image/png';
 }
 
-function buildImagePrompt(scene, aspect) {
+function buildImagePrompt(scene, aspect, hasReference) {
   const aspectHint = aspect === '9:16' ? '9:16 vertical aspect (portrait)'
                    : aspect === '16:9' ? '16:9 horizontal aspect (landscape, cinematic widescreen)'
                    : aspect === '1:1'  ? '1:1 square aspect'
                    : '9:16 vertical aspect';
   const parts = [
+    // When a reference image is attached, lead with a hard preservation rule so
+    // Seedream keeps the user's exact garment/product instead of inventing one.
+    hasReference ? 'Use the attached reference image as the EXACT clothing/product. Keep that same garment/product — identical color, type, fabric, pattern and details — completely unchanged; do NOT redesign, recolor, or replace it. Apply ONLY the pose, camera, framing and setting described below.' : '',
     (scene.prompt || 'storyboard frame').trim(),
     scene.shot_type   ? `Shot type: ${scene.shot_type}.`   : '',
     scene.camera_move ? `Camera move: ${scene.camera_move}.` : '',
@@ -199,7 +202,7 @@ async function generateSceneImage(sceneId, scene, opts = {}) {
   }
 
   try {
-    const prompt = buildImagePrompt(scene || {}, opts.aspect);
+    const prompt = buildImagePrompt(scene || {}, opts.aspect, !!opts.referenceImage);
     const url    = DOUBAO_API_KEY
       ? await callDoubao(prompt, sceneId, { size, referenceImage: opts.referenceImage })
       : await callGemini(prompt, sceneId);
