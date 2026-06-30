@@ -86,15 +86,68 @@ async function generateClipFromImage({ imagePath, outputClipPath, prompt, durati
   }
 
   const imageRef = await imageToRef(imagePath);
-  report(4, 'Submitting Seedance task');
-  const taskId = await createTask({ imageRef, prompt, duration, aspect });
-  report(8, 'Seedance task queued');
+  try {
+    report(4, 'Submitting Seedance task');
+    const taskId = await createTask({ imageRef, prompt, duration, aspect });
+    report(8, 'Seedance task queued');
 
-  const videoUrl = await pollTask(taskId, report);
-  report(92, 'Downloading clip');
-  await downloadToFile(videoUrl, outputClipPath);
-  report(100, 'Clip ready');
-  return outputClipPath;
+    const videoUrl = await pollTask(taskId, report);
+    report(92, 'Downloading clip');
+    await downloadToFile(videoUrl, outputClipPath);
+    report(100, 'Clip ready');
+    return outputClipPath;
+  } catch (e) {
+    // i2v can hard-reject some images — most notably Seedance's real-person
+    // privacy block (clothing/model shots). Rather than fail the whole render,
+    // degrade to a Ken-Burns motion clip on the still so the scene still moves.
+    console.warn(`[seedance] i2v failed (${(e.message || '').slice(0, 140)}) — falling back to motion-on-still`);
+    report(55, 'i2v unavailable for this image — using motion-on-still');
+    await generateKenBurnsClip(imagePath, outputClipPath, { aspect, duration });
+    report(100, 'Fallback clip ready');
+    return outputClipPath;
+  }
+}
+
+// Slow zoom/pan on the actual scene image — a graceful fallback when i2v is
+// unavailable (e.g. real-person block). Far better than a blank placeholder.
+async function generateKenBurnsClip(imagePath, outputPath, { aspect, duration }) {
+  const { w, h } = mockSizeForAspect(aspect);
+  const { localPath, cleanup } = await ensureLocalImage(imagePath, outputPath);
+  const fps = 30;
+  const frames = Math.max(1, Math.round((duration || ARK_CLIP_SECONDS) * fps));
+  const vf = `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h},`
+    + `zoompan=z='min(zoom+0.0009,1.2)':d=${frames}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s=${w}x${h}:fps=${fps},setsar=1`;
+  try {
+    await runFfmpeg([
+      '-y', '-loop', '1', '-i', localPath,
+      '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+      '-t', String(duration || ARK_CLIP_SECONDS),
+      '-vf', vf,
+      '-c:v', 'libx264', '-preset', 'veryfast', '-pix_fmt', 'yuv420p', '-threads', '1',
+      '-c:a', 'aac', '-b:a', '128k', '-shortest', '-movflags', '+faststart',
+      outputPath,
+    ]);
+  } finally {
+    cleanup();
+  }
+}
+
+// Return a local disk path for an image given as a URL or a (web/disk) path,
+// downloading URLs to a temp file next to the output clip.
+async function ensureLocalImage(imagePath, outputPath) {
+  if (/^https?:\/\//i.test(imagePath)) {
+    const ext = (path.extname(new URL(imagePath).pathname) || '.jpg').slice(0, 5);
+    const tmp = `${outputPath}.src${ext}`;
+    const res = await arkFetch(imagePath, { method: 'GET' }, 60_000);
+    if (!res.ok) throw new Error(`fallback: could not fetch scene image ${res.status}`);
+    fs.writeFileSync(tmp, Buffer.from(await res.arrayBuffer()));
+    return { localPath: tmp, cleanup: () => { try { fs.unlinkSync(tmp); } catch (_) {} } };
+  }
+  const diskPath = path.isAbsolute(imagePath) && fs.existsSync(imagePath)
+    ? imagePath
+    : path.join(ROOT, imagePath.replace(/^\//, ''));
+  if (!fs.existsSync(diskPath)) throw new Error(`fallback: image not found on disk: ${diskPath}`);
+  return { localPath: diskPath, cleanup: () => {} };
 }
 
 async function imageToRef(imagePath) {
