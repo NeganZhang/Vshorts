@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { supabase, IS_LOCAL } from '../lib/supabase';
 
 interface Msg { role: 'user' | 'agent'; text: string }
 
@@ -23,13 +24,17 @@ export default function AgentDock() {
     setMsgs((m) => [...m, { role: 'user', text }]);
     setBusy(true);
     try {
-      const token = localStorage.getItem('sb-access-token');
+      // Real Supabase session token (falls back to the dev token only on localhost).
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token || (IS_LOCAL ? 'vshort-local-dev-token' : null);
+      if (!token) {
+        setMsgs((m) => [...m, { role: 'agent', text: '请先点右上角「登录」再和我对话哦~ 登录后我就能帮你写脚本、出分镜、跑视频。' }]);
+        setBusy(false);
+        return;
+      }
       const res = await fetch('/api/agent', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token || 'vshort-local-dev-token'}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ message: text, projectId, history }),
       });
       if (!res.ok) throw new Error(String(res.status));
