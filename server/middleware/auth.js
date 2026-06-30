@@ -62,6 +62,10 @@ function authOptional(req, res, next) {
   if (header && header.startsWith('Bearer ')) {
     try {
       const token = header.slice(7);
+      if (token === LOCAL_DEV_TOKEN && process.env.NODE_ENV !== 'production') {
+        req.user = { id: process.env.LOCAL_DEV_USER_ID || 'local-dev-user', email: 'local@vshort.dev' };
+        return next();
+      }
       let payload;
       try {
         payload = jwt.verify(token, SUPABASE_JWT_SECRET);

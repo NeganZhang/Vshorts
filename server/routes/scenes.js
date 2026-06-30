@@ -2,7 +2,7 @@ const { Router } = require('express');
 const data = require('../data');
 const { projectOwner } = require('../middleware/ownership');
 const { generateSceneImage } = require('../services/imageGen');
-const { splitScriptIntoScenes } = require('../services/claude');
+const { buildScenesData } = require('../services/sceneSplit');
 
 const router = Router();
 
@@ -104,29 +104,7 @@ router.post('/:projectId/scenes/auto-generate', async (req, res) => {
     const aspect = req.body.aspect || null;
     const referenceImage = req.body.referenceImage || null;
 
-    // Prefer the LLM semantic split; fall back to a word-chunk split.
-    let scenesData = null;
-    try {
-      const split = await splitScriptIntoScenes(prompt, numScenes);
-      if (Array.isArray(split) && split.length === numScenes) scenesData = split;
-    } catch (e) { console.warn('[auto-generate] splitter threw:', e.message); }
-
-    if (!scenesData) {
-      const words = prompt.split(/\s+/);
-      const perScene = Math.ceil(words.length / numScenes);
-      scenesData = [];
-      for (let i = 0; i < numScenes; i++) {
-        const chunk = words.slice(i * perScene, (i + 1) * perScene).join(' ');
-        const startSec = i * Math.round(45 / numScenes);
-        const endSec = (i + 1) * Math.round(45 / numScenes);
-        scenesData.push({
-          prompt: chunk || `Scene ${i + 1}`,
-          shot_type: SHOT_TYPES[i % SHOT_TYPES.length],
-          camera_move: CAMERA_MOVES[i % CAMERA_MOVES.length],
-          duration: `${startSec}-${endSec}s`,
-        });
-      }
-    }
+    const scenesData = await buildScenesData(prompt, numScenes);
 
     await data.scenes.deleteByProject(projectId);
     const rows = scenesData.map((s, i) => ({

@@ -64,6 +64,9 @@ app.use('/api/projects', authRequired, require('./routes/scenes'));
 app.use('/api/projects', authRequired, require('./routes/clips'));
 app.use('/api/projects', authRequired, require('./routes/editJobs'));
 
+// Templates: gallery is public (prompt stripped); publish + run need auth.
+app.use('/api/templates', require('./routes/templates'));
+
 // Conversational agent (drives the pipeline via the API above)
 app.use('/api/agent', authRequired, require('./routes/agent'));
 

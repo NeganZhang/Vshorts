@@ -100,8 +100,16 @@ const jobs = {
 
 // ─── Templates ─────────────────────────────────────────────
 const templates = {
-  listVisible: () => supabase.from('templates').select('*').or('is_official.eq.true,is_public.eq.true').order('created_at').then(ok),
+  // Official + public templates, plus the caller's own (private) ones.
+  listVisible: (userId) => {
+    const filter = userId
+      ? `is_official.eq.true,is_public.eq.true,created_by.eq.${userId}`
+      : 'is_official.eq.true,is_public.eq.true';
+    return supabase.from('templates').select('*').or(filter).order('created_at').then(ok);
+  },
   getBySlug: (slug) => supabase.from('templates').select('*').eq('slug', slug).maybeSingle().then(ok),
+  get: (id) => supabase.from('templates').select('*').eq('id', id).maybeSingle().then(ok),
+  create: (userId, t) => supabase.from('templates').insert({ ...t, created_by: userId }).select().single().then(ok),
 };
 
 // ─── Billing (profiles carry stripe_customer_id; subscriptions table) ──
