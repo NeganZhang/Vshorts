@@ -114,14 +114,19 @@ async function imageToRef(imagePath) {
 async function createTask({ imageRef, prompt, duration, aspect }) {
   // Seedance 1.5 Pro takes generation params as --flags appended to the text
   // prompt (not as top-level JSON fields).
+  // Seedance 2.0 (BytePlus): generation params are top-level JSON fields; the
+  // storyboard image is passed as a reference_image.
   const motion = (prompt && prompt.trim()) || 'Subtle, natural motion. Cinematic short-video clip.';
-  const flags = `--resolution ${ARK_VIDEO_RESOLUTION} --ratio ${ratioForAspect(aspect)} --duration ${duration} --watermark ${ARK_WATERMARK} --camerafixed false`;
   const body = {
     model: ARK_VIDEO_MODEL,
     content: [
-      { type: 'text', text: `${motion} ${flags}` },
-      { type: 'image_url', image_url: { url: imageRef } },
+      { type: 'text', text: motion },
+      { type: 'image_url', image_url: { url: imageRef }, role: 'reference_image' },
     ],
+    ratio: ratioForAspect(aspect),
+    duration,
+    watermark: ARK_WATERMARK,
+    generate_audio: false,
   };
 
   const res = await arkFetch(ARK_VIDEO_URL, {
