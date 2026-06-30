@@ -285,6 +285,7 @@ Output ONLY valid JSON (no markdown fences, no prose), in this shape:
     ? `规则：
 - "scenes" 长度必须 = ${numScenes}，按剧情顺序排列。
 - "prompt" 必须是单个具体可拍摄的视觉描述（无对白、无字幕），≤ 200 字。
+- 【最重要】所有分镜是同一主角/主体、同一画风、构成连贯的故事。每个 "prompt" 都必须重复主角的外观特征（例如「一只灰色虎斑小猫」），并紧扣主题，绝不能出现与主题无关的人或物。先在脑中固定主角的样子，再让它贯穿每一个分镜。
 - "shot_type" 必须是以下之一：${SPLIT_SHOT_TYPES.join(', ')}
 - "camera_move" 必须是以下之一：${SPLIT_CAMERA_MOVES.join(', ')}
 - "duration" 格式 "Xs-Ys"，全部相加约等于 30-60 秒。
@@ -292,6 +293,7 @@ Output ONLY valid JSON (no markdown fences, no prose), in this shape:
     : `Rules:
 - "scenes" length MUST equal ${numScenes}, in narrative order.
 - "prompt" MUST be one concrete, shootable visual description (no dialogue, no captions), ≤ 200 chars.
+- MOST IMPORTANT: all scenes share the SAME subject/characters, the SAME visual style, and form ONE coherent story. EVERY "prompt" must restate the subject's key appearance (e.g. "a small grey tabby kitten") and stay strictly on the topic — never introduce unrelated people or objects. Lock the subject's look first, then carry it through every scene.
 - "shot_type" MUST be one of: ${SPLIT_SHOT_TYPES.join(', ')}
 - "camera_move" MUST be one of: ${SPLIT_CAMERA_MOVES.join(', ')}
 - "duration" format "Xs-Ys"; durations should sum to roughly 30-60 seconds total.
@@ -337,9 +339,28 @@ async function callKimiJSON(systemPrompt, userPrompt) {
  * null when KIMI_API_KEY is absent / the call fails / the output can't be
  * parsed — caller should fall back to a naive split.
  */
+// Claude-based JSON splitter (used when KIMI is absent but ANTHROPIC is set).
+async function callClaudeJSON(systemPrompt, userPrompt) {
+  const res = await proxiedFetch(ANTHROPIC_URL, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: 2000,
+      system: systemPrompt + '\n\nReturn ONLY the raw JSON object. No prose, no markdown code fences.',
+      messages: [{ role: 'user', content: userPrompt }],
+    }),
+  });
+  if (!res.ok) throw new Error(`Anthropic split ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const data = await res.json();
+  const text = (data?.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+  if (!text) throw new Error('Empty response from Claude');
+  return text;
+}
+
 async function splitScriptIntoScenes(script, numScenes) {
-  if (!KIMI_API_KEY) return null;
   if (!script || !numScenes || numScenes < 1) return null;
+  if (!KIMI_API_KEY && !ANTHROPIC_API_KEY) return null;
 
   const n    = Math.max(1, Math.min(20, numScenes | 0));
   const cjk  = hasCJK(script);
@@ -347,9 +368,9 @@ async function splitScriptIntoScenes(script, numScenes) {
 
   let raw;
   try {
-    raw = await callKimiJSON(sys, script);
+    raw = KIMI_API_KEY ? await callKimiJSON(sys, script) : await callClaudeJSON(sys, script);
   } catch (e) {
-    console.warn('[splitter] Kimi call failed:', e.message);
+    console.warn('[splitter] LLM call failed:', e.message);
     return null;
   }
 
