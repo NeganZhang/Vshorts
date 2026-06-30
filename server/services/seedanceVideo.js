@@ -18,7 +18,7 @@ const { Agent } = require('undici');
 const ROOT = path.resolve(__dirname, '..', '..');
 
 const ARK_API_KEY   = process.env.ARK_API_KEY || process.env.SEEDANCE_API_KEY || '';
-const ARK_VIDEO_MODEL = process.env.ARK_VIDEO_MODEL || 'doubao-seedance-2-0-260128';
+const ARK_VIDEO_MODEL = process.env.ARK_VIDEO_MODEL || 'doubao-seedance-1-5-pro-251215';
 const ARK_VIDEO_URL = process.env.ARK_VIDEO_URL
   || 'https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks';
 const ARK_VIDEO_RESOLUTION = process.env.ARK_VIDEO_RESOLUTION || '1080p';
@@ -85,9 +85,9 @@ async function generateClipFromImage({ imagePath, outputClipPath, prompt, durati
     return outputClipPath;
   }
 
-  const dataUri = await imageToDataUri(imagePath);
+  const imageRef = await imageToRef(imagePath);
   report(4, 'Submitting Seedance task');
-  const taskId = await createTask({ dataUri, prompt, duration, aspect });
+  const taskId = await createTask({ imageRef, prompt, duration, aspect });
   report(8, 'Seedance task queued');
 
   const videoUrl = await pollTask(taskId, report);
@@ -97,15 +97,10 @@ async function generateClipFromImage({ imagePath, outputClipPath, prompt, durati
   return outputClipPath;
 }
 
-async function imageToDataUri(imagePath) {
-  // Accept a Supabase Storage URL (http), a web path, or an absolute disk path.
-  if (/^https?:\/\//i.test(imagePath)) {
-    const res = await fetch(imagePath);
-    if (!res.ok) throw new Error(`i2v: fetch image ${res.status}`);
-    const ct = res.headers.get('content-type') || 'image/png';
-    const buf = Buffer.from(await res.arrayBuffer());
-    return `data:${ct};base64,${buf.toString('base64')}`;
-  }
+async function imageToRef(imagePath) {
+  // Seedance accepts a public image URL directly (scene images are Supabase
+  // Storage public URLs). Only embed base64 for a local disk file.
+  if (/^https?:\/\//i.test(imagePath)) return imagePath;
   const diskPath = path.isAbsolute(imagePath) && fs.existsSync(imagePath)
     ? imagePath
     : path.join(ROOT, imagePath.replace(/^\//, ''));
@@ -116,17 +111,17 @@ async function imageToDataUri(imagePath) {
   return `data:${mime};base64,${b64}`;
 }
 
-async function createTask({ dataUri, prompt, duration, aspect }) {
+async function createTask({ imageRef, prompt, duration, aspect }) {
+  // Seedance 1.5 Pro takes generation params as --flags appended to the text
+  // prompt (not as top-level JSON fields).
+  const motion = (prompt && prompt.trim()) || 'Subtle, natural motion. Cinematic short-video clip.';
+  const flags = `--resolution ${ARK_VIDEO_RESOLUTION} --ratio ${ratioForAspect(aspect)} --duration ${duration} --watermark ${ARK_WATERMARK} --camerafixed false`;
   const body = {
     model: ARK_VIDEO_MODEL,
     content: [
-      { type: 'text', text: (prompt && prompt.trim()) || 'Subtle, natural motion. Cinematic short-video clip.' },
-      { type: 'image_url', image_url: { url: dataUri } },
+      { type: 'text', text: `${motion} ${flags}` },
+      { type: 'image_url', image_url: { url: imageRef } },
     ],
-    resolution: ARK_VIDEO_RESOLUTION,
-    ratio: ratioForAspect(aspect),
-    duration,
-    watermark: ARK_WATERMARK,
   };
 
   const res = await arkFetch(ARK_VIDEO_URL, {

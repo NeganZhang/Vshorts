@@ -26,8 +26,9 @@ Browser ──> Railway service (Dockerfile: Node 22 + ffmpeg)
    SUPABASE_URL=https://<your-project>.supabase.co
    SUPABASE_SERVICE_ROLE_KEY=<service role / sb_secret_…>
    ANTHROPIC_API_KEY=<sk-ant-…>
-   GEMINI_API_KEY=<…>            # optional; enables real storyboard images
-   ARK_API_KEY=<…>              # optional; enables real Seedance video
+   DOUBAO_API_KEY=<…>           # optional; Doubao Seedream → real storyboard images (domestic, no proxy)
+   DOUBAO_MODEL=doubao-seedream-5-0-260128
+   ARK_API_KEY=<…>              # optional; enables real Seedance video (same Ark key works for both)
    ARK_VIDEO_MODEL=doubao-seedance-2-0-260128
    ARK_VIDEO_RESOLUTION=720p
    MAX_RENDER_SCENES=8
