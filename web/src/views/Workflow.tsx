@@ -28,15 +28,20 @@ export default function Workflow({ nav }: { nav: Nav }) {
   const [refFile, setRefFile] = useState<File | null>(null);   // uploaded garment/product photo
   const [refUrl, setRefUrl] = useState<string | null>(null);   // its public URL (image-to-image)
   const [showPublish, setShowPublish] = useState(false);
+  const [showRef, setShowRef] = useState(false);   // reference upload is hidden until asked for
   const { projectId: ctxPid, setProjectId } = useProject();
   const pidRef = useRef<string | null>(null);
 
   // If the agent (or a previous session) set a project, load its scenes here so
-  // the workspace reflects what the assistant just made.
+  // the workspace reflects what the assistant just made. If that project no
+  // longer exists (stale localStorage id), clear it so we start fresh instead
+  // of erroring with "project not found".
   useEffect(() => {
     if (ctxPid && pidRef.current !== ctxPid) {
       pidRef.current = ctxPid;
-      api.getScenes(ctxPid).then(setScenes).catch(() => { /* ignore */ });
+      api.getScenes(ctxPid)
+        .then(setScenes)
+        .catch(() => { pidRef.current = null; setProjectId(null); });
     }
   }, [ctxPid]);
 
@@ -157,12 +162,16 @@ export default function Workflow({ nav }: { nav: Nav }) {
           <div className="space-y-3">
             <textarea className="field min-h-28" placeholder="一句话描述你的视频想法…"
               value={idea} onChange={(e) => setIdea(e.target.value)} />
-            <label className="block">
-              <span className="text-xs text-muted">参考图(可选)— 上传后用「图生图」保真</span>
-              <input type="file" accept="image/*" className="field mt-1 text-sm file:hidden"
-                onChange={(e) => { const file = e.target.files?.[0] || null; setRefFile(file); setRefUrl(null); }} />
-              {refFile && <span className="text-[11px] text-vshort">已选:{refFile.name}</span>}
-            </label>
+            {!showRef ? (
+              <button className="text-xs text-muted hover:text-fg" onClick={() => setShowRef(true)}>＋ 添加参考图(可选)</button>
+            ) : (
+              <label className="block">
+                <span className="text-xs text-muted">参考图 — 上传后用「图生图」保真</span>
+                <input type="file" accept="image/*" className="field mt-1 text-sm file:hidden"
+                  onChange={(e) => { const file = e.target.files?.[0] || null; setRefFile(file); setRefUrl(null); }} />
+                {refFile && <span className="text-[11px] text-vshort">已选:{refFile.name}</span>}
+              </label>
+            )}
           </div>
         )}
 
@@ -179,19 +188,6 @@ export default function Workflow({ nav }: { nav: Nav }) {
             分镜数
             <select className="field mt-1 py-2" value={sceneCount} onChange={(e) => setSceneCount(Number(e.target.value))}>
               {[3, 4, 5, 6, 8].map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
-          <label className="text-xs text-muted">
-            每段时长
-            <select className="field mt-1 py-2" value={clipSeconds} onChange={(e) => setClipSeconds(Number(e.target.value))}>
-              {[4, 5, 6, 8, 10].map((n) => <option key={n} value={n}>{n}s</option>)}
-            </select>
-          </label>
-          <label className="text-xs text-muted">
-            分辨率
-            <select className="field mt-1 py-2" value={resolution} onChange={(e) => setResolution(e.target.value as '720p' | '1080p')}>
-              <option value="720p">720p(快)</option>
-              <option value="1080p">1080p(更清晰)</option>
             </select>
           </label>
         </div>
@@ -231,14 +227,27 @@ export default function Workflow({ nav }: { nav: Nav }) {
             </div>
 
             <div className="glass rounded-2xl p-5 mt-5">
-              <div className="flex items-center justify-between gap-4 flex-wrap">
-                <div className="text-sm text-muted">
-                  {readyScenes.length}/{scenes.length} 个分镜就绪 · 画幅 {aspect}
+              <div className="flex items-end justify-between gap-4 flex-wrap">
+                <div className="flex gap-3">
+                  <label className="text-xs text-muted">
+                    每段时长
+                    <select className="field mt-1 py-2" value={clipSeconds} onChange={(e) => setClipSeconds(Number(e.target.value))}>
+                      {[4, 5, 6, 8, 10].map((n) => <option key={n} value={n}>{n}s</option>)}
+                    </select>
+                  </label>
+                  <label className="text-xs text-muted">
+                    分辨率
+                    <select className="field mt-1 py-2" value={resolution} onChange={(e) => setResolution(e.target.value as '720p' | '1080p')}>
+                      <option value="720p">720p(快)</option>
+                      <option value="1080p">1080p(更清晰)</option>
+                    </select>
+                  </label>
                 </div>
                 <button className="btn-primary" disabled={readyScenes.length === 0 || (job?.status === 'processing')} onClick={onRender}>
                   {job?.status === 'processing' ? '渲染中…' : '生成视频 →'}
                 </button>
               </div>
+              <div className="text-xs text-muted mt-2">{readyScenes.length}/{scenes.length} 个分镜就绪 · 画幅 {aspect} · 约 {readyScenes.length * clipSeconds}s</div>
 
               {job && job.status === 'processing' && (
                 <div className="mt-4">
