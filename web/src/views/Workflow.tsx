@@ -76,7 +76,9 @@ export default function Workflow({ nav }: { nav: Nav }) {
       for (let i = 0; i < 600; i++) {
         const j = await api.getJob(pid, jobId);
         setJob(j);
-        if (j.status === 'done') { setVideoUrl(api.downloadUrl(pid, jobId)); return; }
+        // Use the public Storage URL directly — <video>/<a> can't send the auth
+        // header the /download endpoint requires (that returned 401 JSON).
+        if (j.status === 'done') { setVideoUrl(j.output_path || api.downloadUrl(pid, jobId)); return; }
         if (j.status === 'error') throw new Error(j.error_msg || '渲染失败');
         await sleep(1500);
       }
@@ -196,7 +198,7 @@ export default function Workflow({ nav }: { nav: Nav }) {
               {videoUrl && (
                 <div className="mt-4">
                   <video src={videoUrl} controls className="w-full max-w-xs mx-auto rounded-xl bg-black" />
-                  <a href={videoUrl} download className="btn-ghost w-full mt-3">下载 MP4</a>
+                  <a href={videoUrl} download target="_blank" rel="noopener" className="btn-ghost w-full mt-3">下载 MP4</a>
                 </div>
               )}
             </div>
