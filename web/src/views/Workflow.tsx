@@ -1,7 +1,8 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Nav } from '../App';
 import { api, aspectToFormat } from '../lib/api';
 import { buildPrompt } from '../lib/templates';
+import { useProject } from '../state/project';
 import PublishModal from '../components/PublishModal';
 import type { Aspect, EditJob, Scene } from '../lib/types';
 
@@ -27,7 +28,17 @@ export default function Workflow({ nav }: { nav: Nav }) {
   const [refFile, setRefFile] = useState<File | null>(null);   // uploaded garment/product photo
   const [refUrl, setRefUrl] = useState<string | null>(null);   // its public URL (image-to-image)
   const [showPublish, setShowPublish] = useState(false);
+  const { projectId: ctxPid, setProjectId } = useProject();
   const pidRef = useRef<string | null>(null);
+
+  // If the agent (or a previous session) set a project, load its scenes here so
+  // the workspace reflects what the assistant just made.
+  useEffect(() => {
+    if (ctxPid && pidRef.current !== ctxPid) {
+      pidRef.current = ctxPid;
+      api.getScenes(ctxPid).then(setScenes).catch(() => { /* ignore */ });
+    }
+  }, [ctxPid]);
 
   const canGenerate = useMemo(() => {
     if (tpl) return tpl.inputs.filter((i) => i.required).every((i) => (inputs[i.key] || '').trim());
@@ -56,6 +67,7 @@ export default function Workflow({ nav }: { nav: Nav }) {
         // DB-backed template → run server-side; the prompt stays hidden.
         const r = await api.runTemplate(tpl.id, { inputs, referenceImage: ref, numScenes: sceneCount, aspect });
         pidRef.current = r.projectId;
+        setProjectId(r.projectId);
         setScenes(r.scenes);
         await pollScenes(r.projectId);
       } else {
@@ -76,6 +88,7 @@ export default function Workflow({ nav }: { nav: Nav }) {
     if (pidRef.current) return pidRef.current;
     const proj = await api.createProject(tpl ? tpl.title : 'My VShort');
     pidRef.current = proj.id;
+    setProjectId(proj.id);   // share with the agent dock
     return proj.id;
   }
 

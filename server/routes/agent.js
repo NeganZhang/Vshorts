@@ -11,15 +11,22 @@ const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const SELF = `http://localhost:${process.env.PORT || 3000}`;
 
-const SYSTEM = `You are VShort's assistant — a one-stop AI short-video maker for verticals like
-product showcase, clothing, and brainrot clips. Help the user turn an idea into a finished
-vertical short. Be concise and friendly; reply in the user's language (Chinese or English).
-Use tools to actually do the work:
-- create_storyboard: turn an idea into a set of scenes (this kicks off image generation).
-- get_status: check how many scene images are ready.
-- render_video: stitch the ready scenes into the final video.
-Confirm briefly before rendering (it costs credits). After create_storyboard, tell the user the
-images are generating and they can watch them in the workspace.`;
+const SYSTEM = `You are VShort's assistant — a one-stop AI short-video maker AND a prompt copilot.
+Verticals: product showcase, clothing, brainrot. Be concise and friendly; reply in the user's
+language (Chinese or English).
+
+You can:
+- Turn an idea into a finished vertical short: create_storyboard → get_status → render_video.
+  Confirm briefly before render_video (it costs credits).
+- Help REFINE the user's generation prompt: propose a tighter, more vivid version.
+- Use existing templates: list_templates to see them, run_template to run one with the user's inputs.
+- Assemble a reusable TEMPLATE from a good prompt: write a prompt_template using {{placeholders}}
+  for the parts the end-user fills in, then call publish_template. ALWAYS show the user the draft
+  (title + the prompt + which inputs they'll fill) and get a clear "yes" before publishing.
+  Published prompts are HIDDEN from other users (creator protection) — say so.
+
+After create_storyboard or run_template, tell the user the images are generating and they can
+watch / adjust them in the workspace.`;
 
 const TOOLS = [
   {
@@ -37,6 +44,37 @@ const TOOLS = [
   },
   { name: 'get_status', description: 'Check how many scene images are ready for the current project.', input_schema: { type: 'object', properties: {} } },
   { name: 'render_video', description: 'Stitch the ready scenes into the final video. Returns a job id.', input_schema: { type: 'object', properties: {} } },
+  { name: 'list_templates', description: 'List available templates (official, public, and the user\'s own), with their input keys.', input_schema: { type: 'object', properties: {} } },
+  {
+    name: 'run_template',
+    description: 'Run an existing template by id with the user-provided inputs. Starts image generation.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        template_id: { type: 'string' },
+        inputs: { type: 'object', description: 'values for the template placeholders, keyed by input key' },
+        scene_count: { type: 'integer' },
+        aspect: { type: 'string', enum: ['9:16', '16:9', '1:1'] },
+      },
+      required: ['template_id'],
+    },
+  },
+  {
+    name: 'publish_template',
+    description: 'Publish a reusable template. ONLY after the user confirms. The prompt_template is stored hidden from other users.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        category: { type: 'string' },
+        description: { type: 'string' },
+        reference_mode: { type: 'string', enum: ['text', 'image', 'both'] },
+        prompt_template: { type: 'string', description: 'the generation prompt; use {{placeholders}} for the parts end-users fill in' },
+        style_prompt: { type: 'string', description: 'optional global style appended to every scene' },
+      },
+      required: ['title', 'prompt_template'],
+    },
+  },
 ];
 
 function apiCall(authHeader, method, path, body) {
@@ -74,6 +112,28 @@ async function runTool(name, input, state, authHeader) {
     if (!state.projectId) return { error: 'no project yet' };
     const job = await apiCall(authHeader, 'POST', `/projects/${state.projectId}/edit-jobs`, { config: { exportFormat: 'tiktok' } });
     return { job_id: job.id || job.jobId, status: job.status || 'processing', error: job.error };
+  }
+  if (name === 'list_templates') {
+    const list = await apiCall(authHeader, 'GET', '/templates');
+    return (list || []).map((t) => ({ id: t.id, title: t.title, category: t.category, reference_mode: t.reference_mode, inputs: (t.input_schema || []).map((i) => i.key) }));
+  }
+  if (name === 'run_template') {
+    const r = await apiCall(authHeader, 'POST', `/templates/${input.template_id}/run`, {
+      inputs: input.inputs || {}, numScenes: input.scene_count, aspect: input.aspect,
+    });
+    state.projectId = r.projectId;
+    return { project_id: r.projectId, scenes_created: Array.isArray(r.scenes) ? r.scenes.length : undefined, note: 'images generating asynchronously' };
+  }
+  if (name === 'publish_template') {
+    const keys = [...new Set([...(input.prompt_template || '').matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]))];
+    const input_schema = keys.map((k) => ({ key: k, label: k, type: 'text', required: true }));
+    const t = await apiCall(authHeader, 'POST', '/templates', {
+      title: input.title, category: input.category, description: input.description,
+      reference_mode: input.reference_mode || 'text',
+      defaults: { aspect: '9:16', sceneCount: 5, clipSeconds: 5, stylePrompt: input.style_prompt || '' },
+      input_schema, prompt_template: input.prompt_template, is_public: true,
+    });
+    return { published: true, template_id: t.id, title: t.title, user_inputs: keys };
   }
   return { error: `unknown tool ${name}` };
 }

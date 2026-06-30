@@ -1,18 +1,20 @@
 import { useRef, useState } from 'react';
 import { supabase, IS_LOCAL } from '../lib/supabase';
+import { useProject } from '../state/project';
+import type { Nav } from '../App';
 
 interface Msg { role: 'user' | 'agent'; text: string }
 
-// Bottom-right agent dock. UI is live now; it posts to /api/agent which lands in
-// Phase 2 (Claude tool-use). Until that endpoint exists it degrades to a clear
-// message instead of erroring, so the dock is usable while the backend catches up.
-export default function AgentDock() {
+// Bottom-right agent dock — a prompt copilot that can build storyboards, run
+// templates, and assemble/publish new templates. Shares the active project with
+// the workspace via ProjectProvider, so what it makes shows up there.
+export default function AgentDock({ nav }: { nav: Nav }) {
+  const { projectId, setProjectId } = useProject();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [input, setInput] = useState('');
-  const [projectId, setProjectId] = useState<string | null>(() => localStorage.getItem('vshort_project'));
   const [msgs, setMsgs] = useState<Msg[]>([
-    { role: 'agent', text: '嗨,我是你的短视频助手。告诉我你想做什么,比如「帮我做一条卖咖啡杯的种草视频」,我来写脚本、分镜并生成。' },
+    { role: 'agent', text: '嗨,我是你的短视频助手 + prompt 副驾。可以让我「做一条卖咖啡杯的种草视频」、用某个模板开跑,或者帮你把一段好用的 prompt 整合发布成模板。' },
   ]);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -39,8 +41,9 @@ export default function AgentDock() {
       });
       if (!res.ok) throw new Error(String(res.status));
       const data = await res.json();
-      if (data.projectId) { setProjectId(data.projectId); localStorage.setItem('vshort_project', data.projectId); }
+      if (data.projectId) setProjectId(data.projectId);   // shared with the workspace
       setMsgs((m) => [...m, { role: 'agent', text: data.reply || '(no reply)' }]);
+      nav.refreshTemplates();   // a publish may have added a template
     } catch {
       setMsgs((m) => [...m, {
         role: 'agent',
@@ -70,6 +73,10 @@ export default function AgentDock() {
             ))}
             {busy && <div className="text-xs text-muted">思考中…</div>}
           </div>
+          {projectId && (
+            <button onClick={() => { nav.go('workflow'); setOpen(false); }}
+              className="mx-3 mb-1 text-xs text-vshort hover:underline text-left">在工作台查看 / 调整分镜 →</button>
+          )}
           <div className="p-3 border-t border-line flex gap-2">
             <input
               className="field py-2"

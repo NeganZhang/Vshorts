@@ -48,7 +48,7 @@ export default function App() {
         {view === 'templates' && <Templates nav={nav} />}
         {view === 'workflow' && <Workflow nav={nav} />}
       </main>
-      <AgentDock />
+      <AgentDock nav={nav} />
     </div>
   );
 }
