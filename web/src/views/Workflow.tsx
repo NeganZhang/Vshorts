@@ -15,6 +15,8 @@ export default function Workflow({ nav }: { nav: Nav }) {
   const [idea, setIdea] = useState('');
   const [aspect, setAspect] = useState<Aspect>(tpl?.defaults.aspect ?? '9:16');
   const [sceneCount, setSceneCount] = useState(tpl?.defaults.sceneCount ?? 5);
+  const [clipSeconds, setClipSeconds] = useState(tpl?.defaults.clipSeconds ?? 5);
+  const [resolution, setResolution] = useState<'720p' | '1080p'>('720p');
 
   const [scenes, setScenes] = useState<Scene[]>([]);
   const [genBusy, setGenBusy] = useState(false);
@@ -76,7 +78,7 @@ export default function Workflow({ nav }: { nav: Nav }) {
     const pid = pidRef.current; if (!pid) return;
     setError(''); setVideoUrl('');
     try {
-      const started = await api.startRender(pid, { exportFormat: aspectToFormat(aspect) });
+      const started = await api.startRender(pid, { exportFormat: aspectToFormat(aspect), resolution, clipSeconds });
       const jobId = started.id || started.jobId;
       if (!jobId) throw new Error(started.error || '无法开始渲染');
       for (let i = 0; i < 600; i++) {
@@ -123,12 +125,20 @@ export default function Workflow({ nav }: { nav: Nav }) {
               </label>
             ))}
             {tpl.referenceMode !== 'text' && (
-              <p className="text-[11px] text-muted/80">参考图将用于「图生图」让产品/服装保真(Phase 3 接入)。</p>
+              <p className="text-[11px] text-muted/80">参考图会用「图生图」让产品/服装在每个分镜里保持一致。</p>
             )}
           </div>
         ) : (
-          <textarea className="field min-h-28" placeholder="一句话描述你的视频想法…"
-            value={idea} onChange={(e) => setIdea(e.target.value)} />
+          <div className="space-y-3">
+            <textarea className="field min-h-28" placeholder="一句话描述你的视频想法…"
+              value={idea} onChange={(e) => setIdea(e.target.value)} />
+            <label className="block">
+              <span className="text-xs text-muted">参考图(可选)— 上传后用「图生图」保真</span>
+              <input type="file" accept="image/*" className="field mt-1 text-sm file:hidden"
+                onChange={(e) => { const file = e.target.files?.[0] || null; setRefFile(file); setRefUrl(null); }} />
+              {refFile && <span className="text-[11px] text-vshort">已选:{refFile.name}</span>}
+            </label>
+          </div>
         )}
 
         <div className="grid grid-cols-2 gap-3 mt-4">
@@ -144,6 +154,19 @@ export default function Workflow({ nav }: { nav: Nav }) {
             分镜数
             <select className="field mt-1 py-2" value={sceneCount} onChange={(e) => setSceneCount(Number(e.target.value))}>
               {[3, 4, 5, 6, 8].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-muted">
+            每段时长
+            <select className="field mt-1 py-2" value={clipSeconds} onChange={(e) => setClipSeconds(Number(e.target.value))}>
+              {[4, 5, 6, 8, 10].map((n) => <option key={n} value={n}>{n}s</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-muted">
+            分辨率
+            <select className="field mt-1 py-2" value={resolution} onChange={(e) => setResolution(e.target.value as '720p' | '1080p')}>
+              <option value="720p">720p(快)</option>
+              <option value="1080p">1080p(更清晰)</option>
             </select>
           </label>
         </div>

@@ -30,8 +30,8 @@ function setProgress(jobId, pct, stage, msg) {
 
 // Match the encode size to the Seedance clip resolution so we don't upscale
 // (heavier on RAM/CPU; a small cloud instance OOM-kills 1080p libx264).
-function targetSize(format) {
-  const s = VIDEO_RES === '1080p' ? 1080 : VIDEO_RES === '480p' ? 480 : 720; // short side
+function targetSize(format, res) {
+  const s = res === '1080p' ? 1080 : res === '480p' ? 480 : 720; // short side
   const l = Math.round((s * 16) / 9);
   if (format === 'landscape') return { w: l, h: s };
   if (format === 'square') return { w: s, h: s };
@@ -59,7 +59,8 @@ async function processVideo(jobId, projectId, config = {}) {
   const jobDir = path.join(UPLOADS_ROOT, 'render-jobs', jobId);
   const outputMp4 = path.join(jobDir, 'output.mp4');
   const format = config.exportFormat || 'tiktok';
-  const { w, h } = targetSize(format);
+  const resolution = config.resolution || VIDEO_RES;
+  const { w, h } = targetSize(format, resolution);
   const aspect = aspectForFormat(format);
 
   try {
@@ -77,7 +78,8 @@ async function processVideo(jobId, projectId, config = {}) {
     let total = 0;
     for (const scene of scenes) {
       const ov = overrides.get(scene.id) || {};
-      const dur = ov.durationSeconds ? clampDuration(ov.durationSeconds) : durationFromScene(scene);
+      const dur = ov.durationSeconds ? clampDuration(ov.durationSeconds)
+        : config.clipSeconds ? clampDuration(config.clipSeconds) : durationFromScene(scene);
       if (total + dur > MAX_TOTAL_SECONDS) break;
       total += dur;
       plan.push({ scene, dur, prompt: (ov.motionPrompt || '').trim() || motionPromptForScene(scene) });
@@ -106,7 +108,7 @@ async function processVideo(jobId, projectId, config = {}) {
         await generateClipFromImage({
           imagePath: scene.image_path,
           outputClipPath: sceneClip,
-          prompt, durationSeconds: dur, aspect,
+          prompt, durationSeconds: dur, aspect, resolution,
           onProgress: (pct, msg) => {
             if (RENDER_CONCURRENCY === 1) {
               const lo = I2V_START + (idx / N) * (I2V_END - I2V_START);

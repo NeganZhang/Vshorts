@@ -17,6 +17,7 @@ function validateConfig(config) {
   if (typeof config.music === 'string') clean.music = config.music.slice(0, 100);
   if (VALID_EXPORT_FORMATS.includes(config.exportFormat)) clean.exportFormat = config.exportFormat;
   if (VALID_RESOLUTIONS.includes(config.resolution)) clean.resolution = config.resolution;
+  if (Number.isFinite(config.clipSeconds)) clean.clipSeconds = Math.max(4, Math.min(15, Math.round(config.clipSeconds)));
   if (Array.isArray(config.scenes)) {
     clean.scenes = config.scenes
       .filter((s) => s && typeof s.sceneId === 'string')

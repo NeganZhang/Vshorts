@@ -84,7 +84,7 @@ export const api = {
   },
 
   // ── Render jobs ──
-  async startRender(projectId: string, config: { exportFormat: ExportFormat }): Promise<{ id: string; status: string; error?: string; jobId?: string }> {
+  async startRender(projectId: string, config: { exportFormat: ExportFormat; resolution?: string; clipSeconds?: number }): Promise<{ id: string; status: string; error?: string; jobId?: string }> {
     return req(`/projects/${projectId}/edit-jobs`, { method: 'POST', headers: await headers(), body: JSON.stringify({ config }) });
   },
   async getJob(projectId: string, jobId: string): Promise<EditJob> {
