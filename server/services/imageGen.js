@@ -101,9 +101,9 @@ async function callDoubao(prompt, sceneId, opts = {}) {
     throw new Error(`Doubao ${res.status}: ${errText.slice(0, 400)}`);
   }
 
-  const data = await res.json();
-  const item = data?.data?.[0];
-  if (!item) throw new Error(`Doubao returned no image data: ${JSON.stringify(data).slice(0, 300)}`);
+  const resp = await res.json();
+  const item = resp?.data?.[0];
+  if (!item) throw new Error(`Doubao returned no image data: ${JSON.stringify(resp).slice(0, 300)}`);
 
   let buffer, ext = '.png';
   if (item.url) {
@@ -148,12 +148,12 @@ async function callGemini(prompt, sceneId) {
     throw new Error(`Gemini ${res.status}: ${errText.slice(0, 300)}`);
   }
 
-  const data = await res.json();
-  const parts = data?.candidates?.[0]?.content?.parts || [];
+  const resp = await res.json();
+  const parts = resp?.candidates?.[0]?.content?.parts || [];
   const imgPart = parts.find(p => p?.inlineData?.data);
   if (!imgPart) {
-    const block = data?.promptFeedback?.blockReason;
-    const finish = data?.candidates?.[0]?.finishReason;
+    const block = resp?.promptFeedback?.blockReason;
+    const finish = resp?.candidates?.[0]?.finishReason;
     throw new Error(
       `Gemini returned no image (blockReason=${block || 'none'}, finishReason=${finish || 'none'})`
     );
