@@ -20,6 +20,7 @@ const FFPROBE_BIN = process.env.FFPROBE && fs.existsSync(process.env.FFPROBE) ? 
 const MAX_RENDER_SCENES = Number(process.env.MAX_RENDER_SCENES) || 8;
 const MAX_TOTAL_SECONDS = Number(process.env.MAX_TOTAL_SECONDS) || 80;
 const RENDER_CONCURRENCY = Math.max(1, Number(process.env.ARK_RENDER_CONCURRENCY) || 1);
+const VIDEO_RES = process.env.ARK_VIDEO_RESOLUTION || '720p';
 
 // Progress updates are fire-and-forget (called from sync ffmpeg callbacks too).
 function setProgress(jobId, pct, stage, msg) {
@@ -27,10 +28,14 @@ function setProgress(jobId, pct, stage, msg) {
   data.jobs.setStage(jobId, clamped, stage, msg ? String(msg).slice(0, 500) : null).catch(() => {});
 }
 
+// Match the encode size to the Seedance clip resolution so we don't upscale
+// (heavier on RAM/CPU; a small cloud instance OOM-kills 1080p libx264).
 function targetSize(format) {
-  if (format === 'landscape') return { w: 1920, h: 1080 };
-  if (format === 'square') return { w: 1080, h: 1080 };
-  return { w: 1080, h: 1920 };
+  const s = VIDEO_RES === '1080p' ? 1080 : VIDEO_RES === '480p' ? 480 : 720; // short side
+  const l = Math.round((s * 16) / 9);
+  if (format === 'landscape') return { w: l, h: s };
+  if (format === 'square') return { w: s, h: s };
+  return { w: s, h: l };
 }
 function aspectForFormat(format) {
   if (format === 'landscape') return '16:9';
@@ -185,7 +190,9 @@ async function normalizeClip(input, output, w, h) {
   const args = ['-y'];
   if (hasAudio) args.push('-i', input, '-vf', vf, '-map', '0:v:0', '-map', '0:a:0');
   else args.push('-i', input, '-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100', '-vf', vf, '-map', '0:v:0', '-map', '1:a:0', '-shortest');
-  args.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-ar', '44100', '-ac', '2', '-video_track_timescale', '30000', output);
+  // ultrafast + capped threads keeps libx264 memory low enough for small cloud instances.
+  args.push('-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '23', '-pix_fmt', 'yuv420p', '-threads', '1',
+    '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2', '-video_track_timescale', '30000', output);
   await runFfmpeg(args);
 }
 
