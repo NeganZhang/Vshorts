@@ -6,20 +6,18 @@
 
 update templates set
   input_schema = '[{"key":"image","label":"服装图","type":"image","required":true},{"key":"vibe","label":"风格 / 场景","type":"text","placeholder":"例如:城市街拍、ins 简约风"}]',
-  defaults = '{"aspect":"9:16","sceneCount":5,"clipSeconds":5,"stylePrompt":"stylized 3D CGI fashion render, semi-realistic clean digital-art look, not a real photo"}',
+  defaults = '{"aspect":"9:16","sceneCount":5,"clipSeconds":5,"stylePrompt":"fashion lookbook, model wearing the garment, editorial street style, natural motion"}',
   prompt_template = 'A premium vertical fashion lookbook showcasing ONE single garment — the exact garment shown in the reference image — worn by the SAME consistent model in every scene. The garment must look identical across all scenes: same color, cut, fabric, pattern, and details; only the pose, camera angle, and framing change between scenes. Setting and mood: {{vibe}}.
 
-Render everything as a polished, STYLIZED 3D CGI fashion render — clearly a digital render and NOT a real photograph: smooth, subtly idealized stylized skin, soft clean shading, gentle gradients, a tasteful semi-realistic CGI look. Avoid photographic realism and any real-person appearance.
-
-Produce a sequence of distinct shots, one per scene, in this order, each a clean fashion-editorial frame with soft lighting, shallow depth of field, vertical 9:16 composition:
+Produce a sequence of distinct shots, one per scene, in this order, each a clean fashion-editorial frame with soft natural lighting, shallow depth of field, photorealistic skin and fabric, vertical 9:16 composition:
 1) Full-body front shot — the model stands facing the camera, the complete outfit visible from head to toe, confident relaxed posture.
 2) Three-quarter turn — the model rotates about 45 degrees, revealing the silhouette and the side seams of the garment.
 3) Back view — the model is seen from behind, highlighting the back design, drape, and fit.
 4) Walking shot — the model walks slowly toward the camera, the garment moving naturally with the body.
 5) Detail close-up — a tight shot on the fabric texture, stitching, buttons, collar, or hemline of the garment.
-6) Lifestyle pose — the model relaxed within the {{vibe}} environment.
+6) Lifestyle pose — the model relaxed and candid within the {{vibe}} environment, natural editorial feel.
 
-Hard consistency rules for every scene: keep the SAME stylized model (same face, hairstyle, body type), the SAME garment from the reference image, and a cohesive color palette. Clean stylized 3D CGI render aesthetic, no on-screen text, no captions, no watermark, no brand logos.'
+Hard consistency rules for every scene: keep the SAME model (identical face, hairstyle, body type and skin tone), the SAME garment from the reference image, and a cohesive color palette. High detail, realistic, no on-screen text, no captions, no watermark, no brand logos.'
 where slug = 'clothing' and is_official;
 
 update templates set
