@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(900px 600px at 78% -10%, rgba(255,92,43,0.10), transparent 60%),
+    radial-gradient(800px 600px at 10% 110%, rgba(0,212,255,0.08), transparent 60%),
+    #06060a;
+  color: #eeeef5;
+  font-family: Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: rgba(255,92,43,0.30); }
+
+/* thin dark scrollbars */
+* { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.18) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.16); border-radius: 8px; }
+
+@layer components {
+  .glass {
+    background: rgba(12,12,18,0.62);
+    border: 1px solid rgba(255,255,255,0.08);
+    backdrop-filter: blur(16px);
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl2 px-4 py-2.5 text-sm font-semibold transition;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary { @apply btn bg-vshort text-white hover:brightness-110; }
+  .btn-ghost { @apply btn border border-line text-ink/80 hover:border-white/25 hover:text-ink; }
+  .field {
+    @apply w-full rounded-xl2 bg-white/[0.03] border border-line px-4 py-3 text-ink placeholder:text-white/30;
+    @apply outline-none focus:border-vshort/60;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}

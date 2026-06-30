@@ -1,14 +1,18 @@
 /**
  * VSHORT — Shared API Client
- * Requires: <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+ * Requires: <script src="/vendor/supabase.js"></script>
  * Included by all pages via <script src="/js/api.js">
  */
 
 // ─── Supabase client (uses global from CDN) ────
-const _supabase = window.supabase.createClient(
-  'https://seolaotjqmyrtujehbfo.supabase.co',
-  'sb_publishable_XP4UxVBA0H9jNxcdtO9LUQ_ra8dln8n'
-);
+const LOCAL_DEV_TOKEN = 'vshort-local-dev-token';
+const IS_LOCAL_DEV = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+const _supabase = window.supabase?.createClient
+  ? window.supabase.createClient(
+      'https://seolaotjqmyrtujehbfo.supabase.co',
+      'sb_publishable_XP4UxVBA0H9jNxcdtO9LUQ_ra8dln8n'
+    )
+  : null;
 
 const API = {
   base: '/api',
@@ -19,9 +23,10 @@ const API = {
 
   /** Get current access token from Supabase session (for Express API calls) */
   async _getToken() {
+    if (!_supabase) return IS_LOCAL_DEV ? LOCAL_DEV_TOKEN : null;
     const { data } = await _supabase.auth.getSession();
     this._session = data.session;
-    return data.session?.access_token || null;
+    return data.session?.access_token || (IS_LOCAL_DEV ? LOCAL_DEV_TOKEN : null);
   },
 
   /** Auth headers for Express API calls */
@@ -98,7 +103,7 @@ const API = {
   },
 
   async logout() {
-    await _supabase.auth.signOut();
+    if (_supabase) await _supabase.auth.signOut();
     this.user = null;
     this._session = null;
     this.projectId = null;
@@ -106,6 +111,10 @@ const API = {
   },
 
   async getMe() {
+    if (!_supabase) {
+      this.user = IS_LOCAL_DEV ? { id: 'local-dev-user', email: 'local@vshort.dev' } : null;
+      return this.user;
+    }
     const { data, error } = await _supabase.auth.getUser();
     if (error || !data.user) {
       this.user = null;
@@ -159,11 +168,15 @@ const API = {
   /** Initialize: check Supabase session, get or create project */
   async init() {
     // Restore session from Supabase (auto-persisted)
-    const { data: { session } } = await _supabase.auth.getSession();
+    const { data: { session } } = _supabase
+      ? await _supabase.auth.getSession()
+      : { data: { session: null } };
     this._session = session;
 
     if (session?.user) {
       this.user = { id: session.user.id, email: session.user.email };
+    } else if (IS_LOCAL_DEV) {
+      this.user = { id: 'local-dev-user', email: 'local@vshort.dev' };
     } else {
       this.user = null;
       return null;
@@ -413,3 +426,6 @@ const API = {
     return `${page}?project=${this.projectId}`;
   },
 };
+
+window.API = API;
+window._supabase = _supabase;

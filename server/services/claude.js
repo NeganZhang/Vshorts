@@ -1,4 +1,5 @@
-const db = require('../db');
+const data = require('../data');
+const { proxiedFetch } = require('../httpProxy');
 
 // ─── Config ──────────────────────────────────────
 // Priority: KIMI_API_KEY → ANTHROPIC_API_KEY → mock.
@@ -97,7 +98,7 @@ async function callKimiAPI(prompt) {
 
 // ─── Real Claude API call ────────────────────────
 async function callClaudeAPI(prompt) {
-  const res = await fetch(ANTHROPIC_URL, {
+  const res = await proxiedFetch(ANTHROPIC_URL, {
     method: 'POST',
     headers: {
       'content-type':       'application/json',
@@ -248,12 +249,10 @@ async function generateScript(scriptId, prompt) {
       content = buildMockScript(prompt);
     }
 
-    db.prepare('UPDATE scripts SET content = ?, status = ? WHERE id = ?')
-      .run(content, 'done', scriptId);
+    await data.scripts.setDone(scriptId, content);
   } catch (err) {
     console.error('Script generation error:', err);
-    db.prepare('UPDATE scripts SET status = ?, content = ? WHERE id = ?')
-      .run('error', err.message || 'Generation failed', scriptId);
+    await data.scripts.setError(scriptId, err.message || 'Generation failed');
   }
 }
 

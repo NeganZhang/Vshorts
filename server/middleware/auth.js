@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 // Supabase JWT secret — this is your project's JWT secret from Supabase Dashboard → Settings → API
 // For now, we verify the token structure and trust the Supabase-issued token
 const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET || process.env.JWT_SECRET || 'vshort-dev-secret-change-in-prod';
+const LOCAL_DEV_TOKEN = 'vshort-local-dev-token';
 
 /**
  * Middleware: require a valid Bearer token (Supabase-issued JWT).
@@ -17,6 +18,12 @@ function authRequired(req, res, next) {
 
   try {
     const token = header.slice(7);
+    if (token === LOCAL_DEV_TOKEN && process.env.NODE_ENV !== 'production') {
+      // Map the dev token to a REAL Supabase auth user (projects.user_id is a
+      // UUID with an FK to auth.users), set up via ensure-dev-user.
+      req.user = { id: process.env.LOCAL_DEV_USER_ID || 'local-dev-user', email: 'local@vshort.dev' };
+      return next();
+    }
 
     // Decode the Supabase JWT — Supabase tokens have { sub: userId, email: ... }
     // In production, verify with your Supabase JWT secret

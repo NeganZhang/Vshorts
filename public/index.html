@@ -404,6 +404,17 @@
     @media (max-width: 640px) {
       .plan-grid { grid-template-columns: 1fr; }
     }
+    /* Landing dial + card fit on small / short screens (cards carry longer
+       copy now, so give them room and shrink the dial to keep it on one screen). */
+    @media (max-width: 560px) {
+      #stage { gap: 26px; }
+      #cards { height: 256px; }
+      .card { padding: 22px; }
+    }
+    @media (max-height: 660px) {
+      #dial { transform: scale(.72); margin: -36px 0; }
+      #stage { gap: 16px; }
+    }
 
     .plan-box {
       padding: 24px 20px;
@@ -1209,7 +1220,7 @@
       <div class="card active" data-i="0">
         <span class="card-tag">AI POWERED</span>
         <span class="card-name" style="color:#00d4ff">SCRIPTS</span>
-        <span class="card-desc">Generate viral-ready short scripts in seconds. Perfect hooks, tight structure, killer punchlines — all engineered for max engagement.</span>
+        <span class="card-desc">Generate viral-ready short scripts in seconds: strong hooks, tight structure, punchy lines, all built for retention.</span>
         <button class="card-btn"
           style="background:#00d4ff;color:#000;">GENERATE SCRIPT →</button>
       </div>
@@ -1217,17 +1228,17 @@
       <div class="card" data-i="1">
         <span class="card-tag">VISUAL PLANNING</span>
         <span class="card-name" style="color:#b400ff">STORYBOARD</span>
-        <span class="card-desc">Turn any script into a frame-by-frame visual plan. AI-suggested shots, transitions, and camera angles — ready to shoot.</span>
+        <span class="card-desc">Turn any script into a frame-by-frame visual plan. AI suggests the shot and camera move, then generates a key frame for every scene.</span>
         <button class="card-btn"
           style="background:#b400ff;color:#fff;">CREATE BOARD →</button>
       </div>
 
       <div class="card" data-i="2">
-        <span class="card-tag">UPLOAD &amp; GO VIRAL</span>
+        <span class="card-tag">IMAGE TO VIDEO</span>
         <span class="card-name" style="color:#ff5c2b">VSHORTS</span>
-        <span class="card-desc">Drop your raw clips into our workflow. AI auto-cuts, captions, enhances and packages them into publish-ready viral shorts.</span>
+        <span class="card-desc">Turn your storyboard frames into a finished vertical short. Each scene becomes an AI-generated clip, stitched into one video ready to post.</span>
         <button class="card-btn"
-          style="background:#ff5c2b;color:#fff;">START WORKFLOW →</button>
+          style="background:#ff5c2b;color:#fff;">GENERATE VIDEO →</button>
       </div>
 
     </div>
@@ -1271,9 +1282,9 @@
           <ul class="plan-features">
             <li>2 projects</li>
             <li>5 scripts / day</li>
-            <li>4 storyboard scenes</li>
-            <li>3 clips per project</li>
-            <li>1 video export</li>
+            <li>4 scenes per video</li>
+            <li>720p AI clips</li>
+            <li>1 video render</li>
           </ul>
           <button class="plan-action current" data-plan="free">CURRENT PLAN</button>
         </div>
@@ -1287,9 +1298,9 @@
           <ul class="plan-features">
             <li>20 projects</li>
             <li>50 scripts / day</li>
-            <li>8 storyboard scenes</li>
-            <li>20 clips per project</li>
-            <li>50 video exports</li>
+            <li>8 scenes per video</li>
+            <li>1080p AI clips</li>
+            <li>50 video renders</li>
           </ul>
           <button class="plan-action primary" data-plan="pro">UPGRADE TO PRO</button>
         </div>
@@ -1302,9 +1313,9 @@
           <ul class="plan-features">
             <li>Unlimited projects</li>
             <li>Unlimited scripts</li>
-            <li>8 storyboard scenes</li>
-            <li>Unlimited clips</li>
-            <li>Unlimited exports</li>
+            <li>8 scenes per video</li>
+            <li>1080p AI clips</li>
+            <li>Unlimited renders</li>
           </ul>
           <button class="plan-action select" data-plan="unlimited">GO UNLIMITED</button>
         </div>
@@ -1488,7 +1499,8 @@
 
 </div><!-- #app -->
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/vendor/supabase.js"></script>
+<script src="/vendor/supabase-global.js"></script>
 <script src="/js/api.js"></script>
 <script>
 /* ═══════════════════════════════════════════════

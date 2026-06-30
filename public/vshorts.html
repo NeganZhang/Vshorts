@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VSHORT — Video Editor</title>
+  <title>VSHORT · AI Video</title>
   <style>
     /* ─── RESET & ROOT ─────────────────────────────── */
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
@@ -314,6 +314,11 @@
 
     .panel-section { display: none; }
     .panel-section.active { display: block; }
+    .panel-heading {
+      padding: 16px 4px 10px;
+      font-size: 11px; letter-spacing: 2px; font-weight: 700;
+      color: rgba(255,255,255,.4);
+    }
 
     /* ── ENHANCE TAB ── */
     .enhance-card {
@@ -778,7 +783,7 @@
 <!-- header -->
 <header>
   <a class="logo" href="index.html#skip-intro">V<em>SHORT</em></a>
-  <span class="page-title">V S H O R T S &nbsp; E D I T O R</span>
+  <span class="page-title">A I &nbsp; V I D E O</span>
   <button class="back-btn" id="back-btn" title="Go back">
     <svg viewBox="0 0 200 200">
       <polygon points="100,10 190,100 100,190 10,100"
@@ -791,163 +796,63 @@
 </header>
 
 <!-- workspace -->
+<style>
+  #scene-strip { position:absolute; inset:0; display:flex; flex-wrap:wrap; gap:10px; align-content:flex-start; justify-content:center; padding:20px; overflow-y:auto; z-index:2; }
+  #scene-strip.hidden { display:none; }
+  .scene-strip-empty { margin:auto; color:rgba(255,255,255,.5); font-size:13px; text-align:center; max-width:72%; line-height:1.5; }
+  .scene-card { position:relative; width:88px; height:156px; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,.14); background:#0c0c12; transition:.2s; flex:0 0 auto; }
+  .scene-card img { width:100%; height:100%; object-fit:cover; display:block; }
+  .scene-card .scene-badge { position:absolute; top:4px; left:4px; background:rgba(6,6,10,.72); border:1px solid rgba(255,255,255,.22); border-radius:5px; font-size:11px; font-weight:800; padding:1px 6px; color:#fff; }
+  .scene-card.active { border-color:#ff5c2b; box-shadow:0 0 0 2px rgba(255,92,43,.55); }
+  .scene-card.done { opacity:.5; }
+  .scene-card.done::after { content:'✓'; position:absolute; top:4px; right:5px; color:#39d98a; font-weight:900; font-size:13px; }
+
+  /* ── Responsive: stack preview + panel below the lap-width breakpoint ── */
+  @media (max-width: 860px) {
+    #top-area { flex-direction: column; }
+    #side-panel { width: 100%; border-left: none; border-top: 1px solid rgba(255,255,255,.06); max-height: 46%; }
+    #preview-pane { padding: 12px; }
+    #video-frame { max-width: 300px; }
+    .panel-content { overflow-y: auto; }
+    header .page-title { display: none; }
+  }
+  @media (max-width: 560px) {
+    #workspace { padding-top: 64px; }
+    #video-frame { max-width: 220px; }
+    .scene-card { width: 72px; height: 128px; }
+    #timeline-bar { display: none; }      /* timeline is decorative; reclaim height on phones */
+    #side-panel { max-height: 52%; }
+  }
+  /* Touch devices: bigger tap targets, no hover-only affordances */
+  @media (pointer: coarse) {
+    .panel-tab, .export-option, .music-track, .export-action { min-height: 44px; }
+  }
+</style>
 <div id="workspace">
 
   <!-- top: preview + panel -->
   <div id="top-area">
 
-    <!-- video preview -->
+    <!-- scene strip + result preview -->
     <div id="preview-pane">
       <div id="video-frame">
-        <input type="file" id="file-input" accept="video/*" multiple
-          style="display:none">
-        <button id="add-more-btn" title="Add another clip">+ ADD CLIP</button>
-        <div id="upload-zone">
-          <div class="upload-diamond">
-            <span class="upload-diamond-inner">◈</span>
-          </div>
-          <span class="upload-text">DROP CLIPS HERE</span>
-          <span class="upload-sub">or click to upload</span>
+        <div id="scene-strip">
+          <div class="scene-strip-empty">Loading storyboard scenes…</div>
         </div>
 
         <div id="preview-content">
-          <video id="preview-video" playsinline preload="metadata"></video>
-          <div class="play-btn-overlay" id="play-btn">
-            <div class="play-triangle"></div>
-          </div>
+          <video id="preview-video" playsinline preload="metadata" controls></video>
         </div>
       </div>
     </div>
 
     <!-- side panel -->
     <div id="side-panel">
-      <div class="panel-tabs">
-        <div class="panel-tab active" data-tab="enhance">ENHANCE</div>
-        <div class="panel-tab" data-tab="captions">CAPTIONS</div>
-        <div class="panel-tab" data-tab="music">MUSIC</div>
-        <div class="panel-tab" data-tab="export">EXPORT</div>
-      </div>
       <div class="panel-content">
 
-        <!-- ENHANCE SECTION -->
-        <div class="panel-section active" data-section="enhance">
-          <div class="enhance-card active" data-feature="autocut">
-            <div class="enhance-header">
-              <span class="enhance-name">AUTO-CUT</span>
-              <div class="enhance-toggle"></div>
-            </div>
-            <div class="enhance-desc">AI removes dead air, long pauses, and filler words automatically</div>
-          </div>
-          <div class="enhance-card active" data-feature="color">
-            <div class="enhance-header">
-              <span class="enhance-name">COLOR GRADE</span>
-              <div class="enhance-toggle"></div>
-            </div>
-            <div class="enhance-desc">Apply cinematic color grading tuned for social media</div>
-          </div>
-          <div class="enhance-card" data-feature="zoom">
-            <div class="enhance-header">
-              <span class="enhance-name">SMART ZOOM</span>
-              <div class="enhance-toggle"></div>
-            </div>
-            <div class="enhance-desc">Auto-zooms into speakers and key visual elements</div>
-          </div>
-          <div class="enhance-card" data-feature="stabilize">
-            <div class="enhance-header">
-              <span class="enhance-name">STABILIZE</span>
-              <div class="enhance-toggle"></div>
-            </div>
-            <div class="enhance-desc">Smooth out shaky handheld footage with AI stabilization</div>
-          </div>
-          <div class="enhance-card" data-feature="denoise">
-            <div class="enhance-header">
-              <span class="enhance-name">NOISE REDUCE</span>
-              <div class="enhance-toggle"></div>
-            </div>
-            <div class="enhance-desc">Remove background noise and enhance voice clarity</div>
-          </div>
-        </div>
-
-        <!-- CAPTIONS SECTION -->
-        <div class="panel-section" data-section="captions">
-          <div class="caption-style-grid">
-            <div class="caption-style active" data-style="impact">
-              <div class="caption-preview" style="color:#fff;text-shadow:0 2px 4px rgba(0,0,0,.8)">Bold</div>
-              <div class="caption-label">IMPACT</div>
-            </div>
-            <div class="caption-style" data-style="glow">
-              <div class="caption-preview" style="color:#ff5c2b;font-family:monospace">Neon</div>
-              <div class="caption-label">GLOW</div>
-            </div>
-            <div class="caption-style" data-style="minimal">
-              <div class="caption-preview" style="font-size:12px;font-weight:400;color:rgba(255,255,255,.7)">Clean</div>
-              <div class="caption-label">MINIMAL</div>
-            </div>
-            <div class="caption-style" data-style="viral">
-              <div class="caption-preview" style="color:#ffe600;font-weight:900;letter-spacing:2px">POP</div>
-              <div class="caption-label">VIRAL</div>
-            </div>
-          </div>
-          <div class="option-note">
-            Position, font size, and language are auto-selected by the AI
-            based on your chosen style.
-          </div>
-        </div>
-
-        <!-- MUSIC SECTION -->
-        <div class="panel-section" data-section="music">
-          <div class="music-track active" data-track="viral-energy">
-            <div class="track-icon">♪</div>
-            <div class="track-info">
-              <div class="track-name">Viral Energy</div>
-              <div class="track-meta">Upbeat / Trending</div>
-            </div>
-            <span class="track-dur">0:32</span>
-          </div>
-          <div class="music-track" data-track="dark-ambient">
-            <div class="track-icon">♪</div>
-            <div class="track-info">
-              <div class="track-name">Dark Ambient</div>
-              <div class="track-meta">Cinematic / Moody</div>
-            </div>
-            <span class="track-dur">0:45</span>
-          </div>
-          <div class="music-track" data-track="lofi-chill">
-            <div class="track-icon">♪</div>
-            <div class="track-info">
-              <div class="track-name">Lo-Fi Chill</div>
-              <div class="track-meta">Relaxed / Educational</div>
-            </div>
-            <span class="track-dur">0:38</span>
-          </div>
-          <div class="music-track" data-track="hype-drop">
-            <div class="track-icon">♪</div>
-            <div class="track-info">
-              <div class="track-name">Hype Drop</div>
-              <div class="track-meta">EDM / High Energy</div>
-            </div>
-            <span class="track-dur">0:28</span>
-          </div>
-          <div class="music-track" data-track="acoustic-feel">
-            <div class="track-icon">♪</div>
-            <div class="track-info">
-              <div class="track-name">Acoustic Feel</div>
-              <div class="track-meta">Warm / Storytelling</div>
-            </div>
-            <span class="track-dur">0:50</span>
-          </div>
-          <div class="music-track" data-track="">
-            <div class="track-icon">♪</div>
-            <div class="track-info">
-              <div class="track-name">No Music</div>
-              <div class="track-meta">Voice Only</div>
-            </div>
-            <span class="track-dur">—</span>
-          </div>
-        </div>
-
-        <!-- EXPORT SECTION -->
-        <div class="panel-section" data-section="export">
+        <!-- EXPORT SECTION (sole panel) -->
+        <div class="panel-section active" data-section="export">
+          <div class="panel-heading">OUTPUT FORMAT</div>
           <div class="export-option active" data-format="tiktok">
             <div class="export-name">TikTok / Reels</div>
             <div class="export-desc">9:16 vertical, optimized for mobile feeds</div>
@@ -985,21 +890,9 @@
     </div>
     <div class="tl-tracks">
       <div class="tl-track">
-        <span class="tl-track-label">VIDEO</span>
+        <span class="tl-track-label">SCENES</span>
         <div class="tl-track-bar" id="tl-video-track">
           <div class="tl-playhead" id="tl-playhead"></div>
-        </div>
-      </div>
-      <div class="tl-track">
-        <span class="tl-track-label">CAPTIONS</span>
-        <div class="tl-track-bar">
-          <div class="tl-clip caption">auto-captions</div>
-        </div>
-      </div>
-      <div class="tl-track">
-        <span class="tl-track-label">AUDIO</span>
-        <div class="tl-track-bar">
-          <div class="tl-clip audio" id="tl-audio-clip">♪ Viral Energy</div>
         </div>
       </div>
     </div>
@@ -1007,7 +900,8 @@
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/vendor/supabase.js"></script>
+<script src="/vendor/supabase-global.js"></script>
 <script src="/js/api.js"></script>
 <script>
 /* ═══════════════════════════════════════════════
@@ -1025,154 +919,78 @@ setTimeout(() => triEnter.classList.add('done'), 1300);
 setTimeout(() => { workspace.classList.add('on'); spawnParticles(); }, 1600);
 
 /* ═══════════════════════════════════════════════
-   UPLOAD + CLIP MANAGEMENT
+   SCENE STRIP — storyboard images → AI clips
 ═══════════════════════════════════════════════ */
-const uploadZone     = document.getElementById('upload-zone');
-const fileInput      = document.getElementById('file-input');
 const previewContent = document.getElementById('preview-content');
-const processOverlay = document.getElementById('process-overlay');
-const processFill    = document.getElementById('process-fill');
-const addMoreBtn     = document.getElementById('add-more-btn');
-const previewVideo   = document.getElementById('preview-video');
-const playBtnOverlay = document.getElementById('play-btn');
-const videoTrack     = document.getElementById('tl-video-track');
-const playhead       = document.getElementById('tl-playhead');
-const tlTimeEl       = document.getElementById('tl-time');
-const tlPlayBtn      = document.getElementById('tl-play');
+const processOverlay  = document.getElementById('process-overlay');
+const processFill     = document.getElementById('process-fill');
+const previewVideo    = document.getElementById('preview-video');
+const sceneStrip      = document.getElementById('scene-strip');
+const videoTrack      = document.getElementById('tl-video-track');
+const tlTimeEl        = document.getElementById('tl-time');
+const tlPlayBtn       = document.getElementById('tl-play');
 
-let currentClips = [];
-let selectedClipId = null;
+let scenes = [];
 
-/** Fetch the project's clip list, rebuild the timeline and preview. */
-async function refreshClips() {
-  try {
-    currentClips = await API.getClips() || [];
-  } catch (err) {
-    console.error('Failed to list clips:', err);
-    currentClips = [];
-  }
-  renderTimelineClips();
-  if (currentClips.length === 0) {
-    uploadZone.classList.remove('hidden');
-    addMoreBtn.classList.remove('show');
-    previewContent.classList.remove('show');
-    previewVideo.removeAttribute('src');
-    previewVideo.load();
-    selectedClipId = null;
+async function loadScenes() {
+  try { scenes = (await API.getScenes() || []).filter(s => s.image_path && s.status === 'done'); }
+  catch (e) { console.error('Failed to list scenes:', e); scenes = []; }
+  renderSceneStrip();
+  renderTimelineScenes();
+}
+
+function renderSceneStrip() {
+  if (!sceneStrip) return;
+  sceneStrip.innerHTML = '';
+  if (scenes.length === 0) {
+    sceneStrip.innerHTML = '<div class="scene-strip-empty">No storyboard scenes with images yet.<br>Build your storyboard and generate images first, then come back to render.</div>';
     return;
   }
-  uploadZone.classList.add('hidden');
-  addMoreBtn.classList.add('show');
-  previewContent.classList.add('show');
-  // Keep the current selection if it still exists, otherwise pick the first.
-  const stillHere = currentClips.find(c => c.id === selectedClipId);
-  selectClip((stillHere || currentClips[0]).id);
+  scenes.forEach((s, i) => {
+    const card = document.createElement('div');
+    card.className = 'scene-card';
+    card.dataset.idx = i;
+    const img = document.createElement('img');
+    img.src = s.image_path; img.alt = 'Scene ' + (i + 1);
+    const badge = document.createElement('div');
+    badge.className = 'scene-badge'; badge.textContent = i + 1;
+    card.appendChild(img); card.appendChild(badge);
+    sceneStrip.appendChild(card);
+  });
 }
 
-function clipSrc(clip) {
-  // uploads/clips/<projectId>/<filename-on-disk>
-  const diskName = (clip.filepath || '').replace(/\\/g, '/').split('/').pop();
-  return `/uploads/clips/${API.projectId}/${encodeURIComponent(diskName)}`;
-}
-
-function renderTimelineClips() {
-  // Nuke existing video chips but keep the playhead.
+function renderTimelineScenes() {
+  if (!videoTrack) return;
   videoTrack.querySelectorAll('.tl-clip.video, .tl-empty-hint').forEach(el => el.remove());
-  if (currentClips.length === 0) {
+  if (scenes.length === 0) {
     const hint = document.createElement('div');
-    hint.className = 'tl-empty-hint';
-    hint.textContent = 'NO CLIPS YET';
+    hint.className = 'tl-empty-hint'; hint.textContent = 'NO SCENES';
     videoTrack.appendChild(hint);
     return;
   }
-  // Split track width evenly across clips (client-side durations are
-  // unknown without probing, so equal-width chips are a reasonable default).
-  const slice = 100 / currentClips.length;
-  currentClips.forEach((clip, i) => {
+  const slice = 100 / scenes.length;
+  scenes.forEach((s, i) => {
     const el = document.createElement('div');
-    el.className = 'tl-clip video' + (clip.id === selectedClipId ? ' selected' : '');
-    el.style.left  = (i * slice) + '%';
+    el.className = 'tl-clip video';
+    el.style.left = (i * slice) + '%';
     el.style.width = 'calc(' + slice + '% - 4px)';
-    el.title = clip.filename;
-    el.innerHTML =
-      '<span class="clip-name"></span>' +
-      '<span class="clip-del" title="Delete this clip">×</span>';
-    el.querySelector('.clip-name').textContent = clip.filename;
-    el.addEventListener('click', (ev) => {
-      if (ev.target.classList.contains('clip-del')) return;
-      selectClip(clip.id);
-    });
-    el.querySelector('.clip-del').addEventListener('click', async (ev) => {
-      ev.stopPropagation();
-      if (!confirm(`Delete "${clip.filename}"?`)) return;
-      try {
-        await API.deleteClip(clip.id);
-        if (selectedClipId === clip.id) selectedClipId = null;
-        await refreshClips();
-      } catch (err) {
-        console.error('Delete failed:', err);
-        alert('Failed to delete clip.');
-      }
-    });
+    el.textContent = 'S' + (i + 1);
     videoTrack.appendChild(el);
   });
 }
 
-function selectClip(id) {
-  const clip = currentClips.find(c => c.id === id);
-  if (!clip) return;
-  selectedClipId = id;
-  const src = clipSrc(clip);
-  if (previewVideo.getAttribute('src') !== src) {
-    previewVideo.pause();
-    previewVideo.src = src;
-    previewVideo.load();
-  }
-  renderTimelineClips();
-  playBtnOverlay.classList.remove('hidden');
+// Highlight the scene currently being generated from a "Scene k/N" stage message.
+function reflectSceneProgress(msg) {
+  const m = /Scene\s+(\d+)\s*\/\s*(\d+)/i.exec(msg || '');
+  const active = m ? Number(m[1]) - 1 : -1;
+  document.querySelectorAll('.scene-card').forEach((c, i) => {
+    c.classList.toggle('active', i === active);
+    c.classList.toggle('done', active >= 0 && i < active);
+  });
 }
 
-// Upload flow — works for both the first-time zone and the "add more" chip.
-uploadZone.addEventListener('click', () => fileInput.click());
-addMoreBtn.addEventListener('click', (ev) => { ev.stopPropagation(); fileInput.click(); });
-
-fileInput.addEventListener('change', async () => {
-  const files = fileInput.files;
-  if (!files.length) return;
-
-  processOverlay.classList.add('on');
-  document.getElementById('process-text').textContent = 'U P L O A D I N G';
-  document.getElementById('process-stage-msg').textContent = '';
-  processFill.style.width = '0%';
-
-  try {
-    await API.uploadClips(Array.from(files), (pct) => {
-      processFill.style.width = pct + '%';
-    });
-    processFill.style.width = '100%';
-    await refreshClips();
-  } catch (err) {
-    console.error('Upload error:', err);
-    let msg = 'Upload failed.';
-    try { msg = JSON.parse(err.message).error || msg; } catch (_) { msg = String(err.message || err); }
-    alert('Upload failed: ' + msg);
-  } finally {
-    setTimeout(() => {
-      processOverlay.classList.remove('on');
-      processFill.style.width = '0%';
-    }, 400);
-    fileInput.value = '';
-  }
-});
-
-// Hydrate on load — restores clips from a prior session.
-document.addEventListener('DOMContentLoaded', async () => {
-  await new Promise(r => setTimeout(r, 200));   // let API.init() finish
-  if (API.projectId) await refreshClips();
-});
-
 /* ═══════════════════════════════════════════════
-   PLAYBACK — real <video> element
+   RESULT PLAYBACK (native controls)
 ═══════════════════════════════════════════════ */
 function fmt(sec) {
   if (!isFinite(sec) || sec < 0) sec = 0;
@@ -1180,96 +998,24 @@ function fmt(sec) {
   const s = sec - m * 60;
   return `${String(m).padStart(2,'0')}:${s.toFixed(2).padStart(5,'0')}`;
 }
-
-function updateTimelineFromVideo() {
-  const dur = previewVideo.duration || 0;
-  const cur = previewVideo.currentTime || 0;
-  tlTimeEl.textContent = `${fmt(cur)} / ${fmt(dur)}`;
-  // Position playhead across the selected clip's portion of the track.
-  const idx = currentClips.findIndex(c => c.id === selectedClipId);
-  if (idx < 0 || currentClips.length === 0 || !dur) return;
-  const slice = 100 / currentClips.length;
-  const localPct = cur / dur;
-  playhead.style.left = (idx * slice + localPct * slice) + '%';
-}
-
-previewVideo.addEventListener('timeupdate', updateTimelineFromVideo);
-previewVideo.addEventListener('loadedmetadata', updateTimelineFromVideo);
-previewVideo.addEventListener('play',  () => { tlPlayBtn.textContent = '⏸'; playBtnOverlay.classList.add('hidden'); });
-previewVideo.addEventListener('pause', () => { tlPlayBtn.textContent = '▶'; playBtnOverlay.classList.remove('hidden'); });
-previewVideo.addEventListener('ended', () => {
-  // Hop to the next clip if any, otherwise stop.
-  const idx = currentClips.findIndex(c => c.id === selectedClipId);
-  if (idx >= 0 && idx < currentClips.length - 1) {
-    selectClip(currentClips[idx + 1].id);
-    previewVideo.play().catch(() => { /* autoplay policy */ });
-  }
+previewVideo.addEventListener('timeupdate', () => {
+  tlTimeEl.textContent = `${fmt(previewVideo.currentTime)} / ${fmt(previewVideo.duration || 0)}`;
 });
-
-function togglePlay() {
-  if (!currentClips.length) { fileInput.click(); return; }
-  if (previewVideo.paused) previewVideo.play().catch(e => console.warn('play:', e));
-  else previewVideo.pause();
-}
-playBtnOverlay.addEventListener('click', togglePlay);
-tlPlayBtn.addEventListener('click', togglePlay);
-
-document.getElementById('tl-skip-back').addEventListener('click', () => {
-  if (!currentClips.length) return;
+previewVideo.addEventListener('play',  () => { if (tlPlayBtn) tlPlayBtn.textContent = '⏸'; });
+previewVideo.addEventListener('pause', () => { if (tlPlayBtn) tlPlayBtn.textContent = '▶'; });
+tlPlayBtn && tlPlayBtn.addEventListener('click', () => {
+  if (!previewContent.classList.contains('show')) return;
+  if (previewVideo.paused) previewVideo.play().catch(() => {}); else previewVideo.pause();
+});
+document.getElementById('tl-skip-back') && document.getElementById('tl-skip-back').addEventListener('click', () => {
   previewVideo.currentTime = Math.max(0, previewVideo.currentTime - 5);
 });
-document.getElementById('tl-skip-forward').addEventListener('click', () => {
-  if (!currentClips.length) return;
-  const dur = previewVideo.duration || 0;
-  previewVideo.currentTime = Math.min(dur - 0.1, previewVideo.currentTime + 5);
+document.getElementById('tl-skip-forward') && document.getElementById('tl-skip-forward').addEventListener('click', () => {
+  previewVideo.currentTime = previewVideo.currentTime + 5;
 });
 
 /* ═══════════════════════════════════════════════
-   SIDE PANEL TABS
-═══════════════════════════════════════════════ */
-document.querySelectorAll('.panel-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.panel-section').forEach(s => s.classList.remove('active'));
-    tab.classList.add('active');
-    document.querySelector(`.panel-section[data-section="${tab.dataset.tab}"]`).classList.add('active');
-  });
-});
-
-/* ═══════════════════════════════════════════════
-   ENHANCE TOGGLES
-═══════════════════════════════════════════════ */
-document.querySelectorAll('.enhance-card').forEach(card => {
-  card.addEventListener('click', () => {
-    card.classList.toggle('active');
-  });
-});
-
-/* ═══════════════════════════════════════════════
-   CAPTION STYLES
-═══════════════════════════════════════════════ */
-document.querySelectorAll('.caption-style').forEach(style => {
-  style.addEventListener('click', () => {
-    document.querySelectorAll('.caption-style').forEach(s => s.classList.remove('active'));
-    style.classList.add('active');
-  });
-});
-
-/* ═══════════════════════════════════════════════
-   MUSIC TRACKS
-═══════════════════════════════════════════════ */
-document.querySelectorAll('.music-track').forEach(track => {
-  track.addEventListener('click', () => {
-    document.querySelectorAll('.music-track').forEach(t => t.classList.remove('active'));
-    track.classList.add('active');
-    const name = track.querySelector('.track-name').textContent;
-    const audioClip = document.getElementById('tl-audio-clip');
-    if (audioClip) audioClip.textContent = name === 'No Music' ? '(none)' : '♪ ' + name;
-  });
-});
-
-/* ═══════════════════════════════════════════════
-   EXPORT OPTIONS
+   EXPORT FORMAT OPTIONS
 ═══════════════════════════════════════════════ */
 document.querySelectorAll('.export-option').forEach(opt => {
   opt.addEventListener('click', () => {
@@ -1279,45 +1025,32 @@ document.querySelectorAll('.export-option').forEach(opt => {
 });
 
 /* ═══════════════════════════════════════════════
-   EXPORT → KICK OFF REAL EDIT JOB
+   RENDER → image-to-video job
 ═══════════════════════════════════════════════ */
 const STAGE_LABELS = {
-  concat:    'Stitching clips together',
-  asr:       'Transcribing audio',
-  planning:  'Planning shots with AI',
-  editing:   'Selecting best takes',
-  rendering: 'Rendering final video',
+  load:      'Loading scenes',
+  i2v:       'Generating AI clips',
+  normalize: 'Conforming clips',
+  concat:    'Stitching clips',
+  finalize:  'Finalizing',
   done:      'Ready to download',
   error:     'Something went wrong',
 };
 
-function collectExportConfig() {
-  const enhance = {};
-  document.querySelectorAll('.enhance-card').forEach(card => {
-    enhance[card.dataset.feature] = card.classList.contains('active');
-  });
-  const captionEl = document.querySelector('.caption-style.active');
-  const musicEl   = document.querySelector('.music-track.active');
-  const exportEl  = document.querySelector('.export-option.active');
+function collectRenderConfig() {
+  const exportEl = document.querySelector('.export-option.active');
   return {
-    enhance,
-    captionStyle: captionEl ? captionEl.dataset.style : undefined,
-    music:        musicEl   ? musicEl.dataset.track   : '',
-    exportFormat: exportEl  ? exportEl.dataset.format : 'tiktok',
+    exportFormat: exportEl ? exportEl.dataset.format : 'tiktok',
   };
 }
 
-document.getElementById('export-btn').addEventListener('click', async () => {
+// Poll an existing render job to completion, stream progress, then preview + download.
+async function runJob(jobId) {
   const btn = document.getElementById('export-btn');
   const processText  = document.getElementById('process-text');
   const processStage = document.getElementById('process-stage-msg');
 
-  if (!previewContent.classList.contains('show')) {
-    alert('Upload at least one clip first.');
-    return;
-  }
-
-  btn.textContent = 'EXPORTING...';
+  btn.textContent = 'RENDERING…';
   btn.style.opacity = '.6';
   processOverlay.classList.add('on');
   processFill.style.width = '0%';
@@ -1325,54 +1058,90 @@ document.getElementById('export-btn').addEventListener('click', async () => {
   processStage.textContent = '';
 
   try {
-    const config = collectExportConfig();
-    const job = await API.startEditJob(config);
-    if (!job || !job.id) throw new Error(job && job.error ? job.error : 'Failed to start job');
-
-    // Poll every 800 ms for up to ~30 min.
     const deadline = Date.now() + 30 * 60 * 1000;
-    let current = job;
+    let current = await API.getEditJob(jobId);
     while (Date.now() < deadline) {
       if (current.status === 'done')  break;
-      if (current.status === 'error') throw new Error(current.error_msg || 'Processing failed');
+      if (current.status === 'error') throw new Error(current.error_msg || 'Render failed');
 
       const pct = Math.max(0, Math.min(100, Number(current.progress) || 0));
       processFill.style.width = pct + '%';
       const stage = current.stage || 'processing';
       processText.textContent = (STAGE_LABELS[stage] || stage).toUpperCase().split('').join(' ');
       processStage.textContent = current.stage_msg ? `${pct}%  ${current.stage_msg}` : `${pct}%`;
+      reflectSceneProgress(current.stage_msg);
 
       await new Promise(r => setTimeout(r, 800));
-      current = await API.getEditJob(job.id);
+      current = await API.getEditJob(jobId);
     }
-
     if (current.status !== 'done') throw new Error('Timed out waiting for render');
 
+    document.querySelectorAll('.scene-card').forEach(c => { c.classList.remove('active'); c.classList.add('done'); });
     processFill.style.width = '100%';
     processText.textContent = 'R E A D Y';
-    processStage.textContent = 'Starting download…';
+    processStage.textContent = 'Loading preview…';
+
+    const url = API.getDownloadUrl(current.id);
+    previewVideo.src = url; previewVideo.load();
+    sceneStrip.classList.add('hidden');
+    previewContent.classList.add('show');
 
     const link = document.createElement('a');
-    link.href = API.getDownloadUrl(current.id);
+    link.href = url;
     link.download = `vshort-${current.id.slice(0, 6)}.mp4`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    document.body.appendChild(link); link.click(); link.remove();
 
     setTimeout(() => {
       processOverlay.classList.remove('on');
-      btn.textContent = 'EXPORTED ✓';
+      btn.textContent = 'RENDER AGAIN →';
       btn.style.opacity = '';
-      setTimeout(() => { btn.textContent = 'EXPORT VIDEO →'; }, 1500);
-    }, 800);
+    }, 900);
   } catch (err) {
-    console.error('Export failed:', err);
+    console.error('Render failed:', err);
     processText.textContent = 'E R R O R';
     processStage.textContent = String(err.message || err).slice(0, 200);
     btn.textContent = 'RETRY';
     btn.style.opacity = '';
-    setTimeout(() => { processOverlay.classList.remove('on'); }, 3000);
+    setTimeout(() => { processOverlay.classList.remove('on'); }, 3500);
   }
+}
+
+document.getElementById('export-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('export-btn');
+  if (scenes.length === 0) {
+    alert('No storyboard scenes with images. Build your storyboard and generate images first.');
+    return;
+  }
+  // If a result is showing, let the user render a fresh take.
+  sceneStrip.classList.remove('hidden');
+  previewContent.classList.remove('show');
+
+  btn.textContent = 'STARTING…';
+  btn.style.opacity = '.6';
+  try {
+    const job = await API.startEditJob(collectRenderConfig());
+    if (!job || !job.id) {
+      // 409 → a job is already processing for this project; resume it.
+      if (job && job.jobId) { runJob(job.jobId); return; }
+      throw new Error(job && job.error ? job.error : 'Failed to start render');
+    }
+    history.replaceState(null, '', API.pageUrl('vshorts.html') + '&job=' + encodeURIComponent(job.id));
+    runJob(job.id);
+  } catch (err) {
+    alert('Render failed: ' + (err.message || err));
+    btn.textContent = 'EXPORT VIDEO →';
+    btn.style.opacity = '';
+  }
+});
+
+// Hydrate on load: show the scenes, and if we arrived with ?job= (from the
+// storyboard EXPORT button or a refresh), resume polling that job immediately.
+document.addEventListener('DOMContentLoaded', async () => {
+  await new Promise(r => setTimeout(r, 200));   // let API.init() finish
+  if (!API.projectId) return;
+  await loadScenes();
+  const jobId = new URLSearchParams(location.search).get('job');
+  if (jobId) runJob(jobId);
 });
 
 /* ═══════════════════════════════════════════════

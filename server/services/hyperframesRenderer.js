@@ -374,4 +374,6 @@ function run(command, args, options = {}) {
   });
 }
 
-module.exports = { renderWithHyperFrames };
+// Music helpers are reused by the image-to-video render pipeline
+// (videoProcessor.js) to add optional BGM to a stitched short.
+module.exports = { renderWithHyperFrames, prepareMusic, resolveMusic, generateFallbackMusic };

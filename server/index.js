@@ -5,8 +5,8 @@ const path = require('path');
 const rateLimit = require('express-rate-limit');
 const { authRequired } = require('./middleware/auth');
 
-// Initialize DB (creates tables on first run)
-require('./db');
+// Supabase data + storage layer (replaces local SQLite). Ensure asset buckets.
+require('./data').ensureBuckets();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,8 +34,17 @@ app.use('/api/webhooks/stripe', require('./routes/webhook'));
 app.use(express.json({ limit: '1mb' }));
 
 // ─── Static files ──────────────────────────────
+// In production the built React SPA (web/dist) is the app; the legacy
+// public/ pages remain reachable at their own paths.
+const fs = require('fs');
+const WEB_DIST = path.join(__dirname, '..', 'web', 'dist');
+const HAS_SPA = fs.existsSync(path.join(WEB_DIST, 'index.html'));
+if (HAS_SPA) app.use(express.static(WEB_DIST));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.get('/vendor/supabase.js', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'node_modules', '@supabase', 'supabase-js', 'dist', 'umd', 'supabase.js'));
+});
 
 // ─── Public API Routes (no auth) ───────────────
 app.use('/api/auth', require('./routes/auth'));
@@ -55,12 +64,15 @@ app.use('/api/projects', authRequired, require('./routes/scenes'));
 app.use('/api/projects', authRequired, require('./routes/clips'));
 app.use('/api/projects', authRequired, require('./routes/editJobs'));
 
+// Conversational agent (drives the pipeline via the API above)
+app.use('/api/agent', authRequired, require('./routes/agent'));
+
 // ─── SPA fallback ──────────────────────────────
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ error: 'Not found' });
   }
-  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'));
+  res.sendFile(HAS_SPA ? path.join(WEB_DIST, 'index.html') : path.join(__dirname, '..', 'public', 'index.html'));
 });
 
 // ─── Error handler ─────────────────────────────

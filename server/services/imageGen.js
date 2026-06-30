@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const db  = require('../db');
+const data = require('../data');
+const { proxiedFetch } = require('../httpProxy');
 
 // ─── Config ──────────────────────────────────────
 // Provider priority for image generation:
@@ -34,25 +35,8 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL   = process.env.GEMINI_MODEL   || 'gemini-2.5-flash-image';
 const GEMINI_URL     = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
-// ─── Proxy support ───────────────────────────────
-// Node's global fetch (undici) ignores HTTP(S)_PROXY env vars by default.
-// Only install the proxy dispatcher when we have NO Doubao key — Doubao's
-// endpoint is in mainland China and proxies usually hurt, whereas Gemini
-// (international) requires one from inside China.
-const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy
-              || process.env.HTTP_PROXY  || process.env.http_proxy || '';
-if (proxyUrl && !DOUBAO_API_KEY && GEMINI_API_KEY) {
-  try {
-    const { ProxyAgent, setGlobalDispatcher } = require('undici');
-    setGlobalDispatcher(new ProxyAgent(proxyUrl));
-    console.log('[imageGen] Using HTTPS proxy:', proxyUrl);
-  } catch (e) {
-    console.warn('[imageGen] proxy env set but undici unavailable:', e.message);
-  }
-}
-
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'scenes');
-fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+// International (Gemini) calls route through httpProxy (proxiedFetch); domestic
+// (Doubao/Ark) use the built-in fetch (direct). No global dispatcher mutation.
 
 const MIME_EXT = {
   'image/png':  '.png',
@@ -62,6 +46,10 @@ const MIME_EXT = {
 
 function extFromMime(mime) {
   return MIME_EXT[mime] || '.png';
+}
+
+function mimeFromExt(ext) {
+  return { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' }[ext] || 'image/png';
 }
 
 function buildImagePrompt(scene, aspect) {
@@ -133,9 +121,7 @@ async function callDoubao(prompt, sceneId, opts = {}) {
     throw new Error('Doubao response had neither url nor b64_json');
   }
 
-  const fname = sceneId + ext;
-  fs.writeFileSync(path.join(UPLOADS_DIR, fname), buffer);
-  return `/uploads/scenes/${fname}`;
+  return data.uploadAsset('scenes', sceneId + ext, buffer, mimeFromExt(ext));
 }
 
 // ─── Gemini image generation (fallback) ──────────
@@ -145,7 +131,7 @@ async function callGemini(prompt, sceneId) {
 
   let res;
   try {
-    res = await fetch(`${GEMINI_URL}?key=${encodeURIComponent(GEMINI_API_KEY)}`, {
+    res = await proxiedFetch(`${GEMINI_URL}?key=${encodeURIComponent(GEMINI_API_KEY)}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -175,9 +161,7 @@ async function callGemini(prompt, sceneId) {
 
   const buffer = Buffer.from(imgPart.inlineData.data, 'base64');
   const ext    = extFromMime(imgPart.inlineData.mimeType);
-  const fname  = sceneId + ext;
-  fs.writeFileSync(path.join(UPLOADS_DIR, fname), buffer);
-  return `/uploads/scenes/${fname}`;
+  return data.uploadAsset('scenes', sceneId + ext, buffer, mimeFromExt(ext));
 }
 
 // ─── Startup log so users know which provider is active ──
@@ -203,11 +187,10 @@ async function generateSceneImage(sceneId, scene, opts = {}) {
   if (!DOUBAO_API_KEY && !GEMINI_API_KEY) {
     try {
       await new Promise(r => setTimeout(r, 1500 + Math.random() * 1500));
-      db.prepare('UPDATE scenes SET status = ?, image_path = ? WHERE id = ?')
-        .run('done', null, sceneId);
+      await data.scenes.setImage(sceneId, 'done', null);
     } catch (err) {
       console.error('[imageGen] mock error:', err);
-      db.prepare('UPDATE scenes SET status = ? WHERE id = ?').run('error', sceneId);
+      await data.scenes.setStatus(sceneId, 'error');
     }
     return;
   }
@@ -217,13 +200,11 @@ async function generateSceneImage(sceneId, scene, opts = {}) {
     const url    = DOUBAO_API_KEY
       ? await callDoubao(prompt, sceneId, { size })
       : await callGemini(prompt, sceneId);
-    db.prepare('UPDATE scenes SET status = ?, image_path = ? WHERE id = ?')
-      .run('done', url, sceneId);
+    await data.scenes.setImage(sceneId, 'done', url);
   } catch (err) {
     const cause = err.cause ? ` (cause: ${err.cause.code || err.cause.message || err.cause})` : '';
     console.error('[imageGen]', err.message + cause);
-    db.prepare('UPDATE scenes SET status = ?, image_path = ? WHERE id = ?')
-      .run('error', null, sceneId);
+    await data.scenes.setImage(sceneId, 'error', null);
   }
 }
 

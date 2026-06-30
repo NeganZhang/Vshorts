@@ -1,6 +1,6 @@
 const { Router } = require('express');
 const express = require('express');
-const db = require('../db');
+const data = require('../data');
 
 const router = Router();
 
@@ -72,7 +72,7 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
         // Fetch subscription details from Stripe
         const sub = await stripe.subscriptions.retrieve(stripeSubId);
 
-        upsertSubscription(userId, {
+        await upsertSubscription(userId, {
           stripe_sub_id: stripeSubId,
           plan,
           status: sub.status,
@@ -87,7 +87,7 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
       // ─── Subscription updated ──────────────────
       case 'customer.subscription.updated': {
         const sub = event.data.object;
-        const userId = getUserByStripeCustomer(sub.customer);
+        const userId = await getUserByStripeCustomer(sub.customer);
         if (!userId) {
           console.error('Webhook: no user found for customer', sub.customer);
           break;
@@ -97,7 +97,7 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
         const priceId = sub.items?.data?.[0]?.price?.id;
         const plan = getPlanByPriceId(priceId) || 'pro';
 
-        upsertSubscription(userId, {
+        await upsertSubscription(userId, {
           stripe_sub_id: sub.id,
           plan,
           status: sub.status,
@@ -112,12 +112,10 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
       // ─── Subscription deleted / canceled ───────
       case 'customer.subscription.deleted': {
         const sub = event.data.object;
-        const userId = getUserByStripeCustomer(sub.customer);
+        const userId = await getUserByStripeCustomer(sub.customer);
         if (!userId) break;
 
-        db.prepare(
-          "UPDATE subscriptions SET status = 'canceled', plan = 'free', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?"
-        ).run(userId);
+        await data.billing.updateSubscription(userId, { status: 'canceled', plan: 'free' });
 
         console.log(`Subscription canceled: user=${userId}`);
         break;
@@ -126,12 +124,10 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
       // ─── Payment failed ────────────────────────
       case 'invoice.payment_failed': {
         const invoice = event.data.object;
-        const userId = getUserByStripeCustomer(invoice.customer);
+        const userId = await getUserByStripeCustomer(invoice.customer);
         if (!userId) break;
 
-        db.prepare(
-          "UPDATE subscriptions SET status = 'past_due', updated_at = CURRENT_TIMESTAMP WHERE user_id = ?"
-        ).run(userId);
+        await data.billing.updateSubscription(userId, { status: 'past_due' });
 
         console.log(`Payment failed: user=${userId}`);
         break;
@@ -142,13 +138,12 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
         const invoice = event.data.object;
         if (invoice.billing_reason !== 'subscription_cycle') break;
 
-        const userId = getUserByStripeCustomer(invoice.customer);
+        const userId = await getUserByStripeCustomer(invoice.customer);
         if (!userId) break;
 
         // Reactivate if was past_due
-        db.prepare(
-          "UPDATE subscriptions SET status = 'active', updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND status = 'past_due'"
-        ).run(userId);
+        const cur = await data.billing.getSubscription(userId);
+        if (cur && cur.status === 'past_due') await data.billing.updateSubscription(userId, { status: 'active' });
 
         console.log(`Payment succeeded (renewal): user=${userId}`);
         break;
@@ -168,30 +163,13 @@ router.post('/', express.raw({ type: 'application/json' }), async (req, res) => 
 
 // ─── Helper functions ──────────────────────────
 
-function upsertSubscription(userId, data) {
-  const existing = db.prepare('SELECT id FROM subscriptions WHERE user_id = ?').get(userId);
-
-  if (existing) {
-    db.prepare(`UPDATE subscriptions SET
-      stripe_sub_id = ?, plan = ?, status = ?, current_period_end = ?,
-      cancel_at_period_end = ?, updated_at = CURRENT_TIMESTAMP
-      WHERE user_id = ?`
-    ).run(data.stripe_sub_id, data.plan, data.status, data.current_period_end,
-      data.cancel_at_period_end, userId);
-  } else {
-    const id = require('uuid').v4().slice(0, 16).replace(/-/g, '');
-    db.prepare(`INSERT INTO subscriptions
-      (id, user_id, stripe_sub_id, plan, status, current_period_end, cancel_at_period_end)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run(id, userId, data.stripe_sub_id, data.plan, data.status,
-      data.current_period_end, data.cancel_at_period_end);
-  }
+async function upsertSubscription(userId, sub) {
+  await data.billing.upsertSubscription({ user_id: userId, ...sub });
 }
 
-function getUserByStripeCustomer(stripeCustomerId) {
-  const user = db.prepare('SELECT id FROM users WHERE stripe_customer_id = ?')
-    .get(stripeCustomerId);
-  return user?.id || null;
+async function getUserByStripeCustomer(stripeCustomerId) {
+  const profile = await data.billing.profileByCustomer(stripeCustomerId);
+  return profile ? profile.id : null;
 }
 
 function getPlanByPriceId(priceId) {

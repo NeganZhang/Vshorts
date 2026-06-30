@@ -1,84 +1,54 @@
 const { Router } = require('express');
-const { v4: uuid } = require('uuid');
-const db = require('../db');
+const data = require('../data');
 
 const router = Router();
 
 // ─── List user's projects ──────────────────────
-router.get('/', (req, res) => {
-  const rows = db.prepare(
-    'SELECT * FROM projects WHERE user_id = ? ORDER BY updated_at DESC'
-  ).all(req.user.id);
-  res.json(rows);
+router.get('/', async (req, res, next) => {
+  try { res.json(await data.projects.list(req.user.id)); } catch (e) { next(e); }
 });
 
 // ─── Create project ────────────────────────────
-router.post('/', (req, res) => {
-  const name = (req.body.name || 'Untitled Project').slice(0, 100);
-  const id = uuid().slice(0, 16).replace(/-/g, '');
-
-  // Auth lives in Supabase now, but the local SQLite `projects` table still
-  // has a FK to the legacy local `users` table. Ensure a stub row exists
-  // for the authenticated Supabase user before inserting the project.
-  db.prepare(
-    "INSERT OR IGNORE INTO users (id, email, password) VALUES (?, ?, '__supabase__')"
-  ).run(req.user.id, req.user.email || `${req.user.id}@supabase.local`);
-
-  db.prepare('INSERT INTO projects (id, user_id, name) VALUES (?, ?, ?)')
-    .run(id, req.user.id, name);
-
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(id);
-  res.status(201).json(project);
+router.post('/', async (req, res, next) => {
+  try {
+    const name = (req.body.name || 'Untitled Project').slice(0, 100);
+    const project = await data.projects.create(req.user.id, name);
+    res.status(201).json(project);
+  } catch (e) { next(e); }
 });
 
 // ─── Get project with all data (verify ownership) ──
-router.get('/:id', (req, res) => {
-  const project = db.prepare(
-    'SELECT * FROM projects WHERE id = ? AND user_id = ?'
-  ).get(req.params.id, req.user.id);
-
-  if (!project) return res.status(404).json({ error: 'Project not found' });
-
-  const scripts = db.prepare(
-    'SELECT * FROM scripts WHERE project_id = ? ORDER BY created_at DESC'
-  ).all(req.params.id);
-  const scenes = db.prepare(
-    'SELECT * FROM scenes WHERE project_id = ? ORDER BY sort_order'
-  ).all(req.params.id);
-  const clips = db.prepare(
-    'SELECT * FROM clips WHERE project_id = ? ORDER BY created_at'
-  ).all(req.params.id);
-  const editJobs = db.prepare(
-    'SELECT * FROM edit_jobs WHERE project_id = ? ORDER BY created_at DESC'
-  ).all(req.params.id);
-
-  res.json({ ...project, scripts, scenes, clips, editJobs });
+router.get('/:id', async (req, res, next) => {
+  try {
+    const project = await data.projects.getOwned(req.params.id, req.user.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const [scripts, scenes, clips, editJobs] = await Promise.all([
+      data.scripts.listByProject(req.params.id),
+      data.scenes.list(req.params.id),
+      data.clips.list(req.params.id),
+      data.jobs.list(req.params.id),
+    ]);
+    res.json({ ...project, scripts, scenes, clips, editJobs });
+  } catch (e) { next(e); }
 });
 
 // ─── Update project ────────────────────────────
-router.put('/:id', (req, res) => {
-  const project = db.prepare(
-    'SELECT * FROM projects WHERE id = ? AND user_id = ?'
-  ).get(req.params.id, req.user.id);
-
-  if (!project) return res.status(404).json({ error: 'Project not found' });
-
-  const name = req.body.name ? req.body.name.slice(0, 100) : project.name;
-  db.prepare("UPDATE projects SET name = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-    .run(name, req.params.id);
-
-  const updated = db.prepare('SELECT * FROM projects WHERE id = ?').get(req.params.id);
-  res.json(updated);
+router.put('/:id', async (req, res, next) => {
+  try {
+    const project = await data.projects.getOwned(req.params.id, req.user.id);
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    const name = req.body.name ? req.body.name.slice(0, 100) : project.name;
+    res.json(await data.projects.updateName(req.params.id, name));
+  } catch (e) { next(e); }
 });
 
 // ─── Delete project (verify ownership) ─────────
-router.delete('/:id', (req, res) => {
-  const result = db.prepare(
-    'DELETE FROM projects WHERE id = ? AND user_id = ?'
-  ).run(req.params.id, req.user.id);
-
-  if (result.changes === 0) return res.status(404).json({ error: 'Project not found' });
-  res.json({ deleted: true });
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const removed = await data.projects.remove(req.params.id, req.user.id);
+    if (!removed || removed.length === 0) return res.status(404).json({ error: 'Project not found' });
+    res.json({ deleted: true });
+  } catch (e) { next(e); }
 });
 
 module.exports = router;

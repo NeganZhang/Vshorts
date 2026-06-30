@@ -1,0 +1,1 @@
+window.supabase = supabase;

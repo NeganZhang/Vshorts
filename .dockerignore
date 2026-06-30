@@ -1,0 +1,13 @@
+node_modules
+web/node_modules
+web/dist
+uploads
+outputs
+data
+*.log
+.env
+.env.*
+.git
+.claude
+docs
+supabase

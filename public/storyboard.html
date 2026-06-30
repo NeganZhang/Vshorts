@@ -940,6 +940,27 @@
       transform: translateY(-1px);
     }
 
+    /* ─── Responsive: keep the floating bars usable on small screens ─── */
+    @media (max-width: 760px) {
+      #toolbar  { left: 12px; right: 12px; padding: 6px 10px; }
+      .mode-btn { padding: 8px 14px; letter-spacing: 1px; }
+      .toolbar-right { gap: 6px; }
+      #auto-bar { left: 12px; right: 12px; flex-wrap: wrap; }
+      #bottom-bar { left: 12px; right: 12px; padding: 8px 10px; }
+      .quality-label { display: none; }
+      .aspect-chip { padding: 7px 11px; }
+      .export-btn { padding: 10px 16px; }
+      header .page-title { display: none; }
+    }
+    @media (max-width: 520px) {
+      #toolbar { flex-wrap: wrap; height: auto; gap: 8px; justify-content: center; }
+      #bottom-bar { flex-direction: column; gap: 8px; align-items: stretch; bottom: 12px; }
+      .bottom-left, .bottom-right { justify-content: center; }
+    }
+    @media (pointer: coarse) {
+      .aspect-chip, .mode-btn, .tb-btn, .export-btn { min-height: 40px; }
+    }
+
     /* ─── GENERATING OVERLAY (per scene) ────────── */
     .scene-generating {
       position: absolute; inset: 0;
@@ -1110,7 +1131,8 @@
 
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="/vendor/supabase.js"></script>
+<script src="/vendor/supabase-global.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="/js/api.js"></script>
 <script>
@@ -2088,9 +2110,35 @@ document.querySelectorAll('.aspect-chip').forEach(chip => {
   });
 });
 
-// EXPORT TO VIDEO — placeholder (real video export needs server-side ffmpeg)
-document.getElementById('btn-export').addEventListener('click', () => {
-  flashToast('Video export coming soon — for now use DOWNLOAD PDF', false);
+// EXPORT TO VIDEO — start an image-to-video render job for this project's
+// scenes, then hand off to the vshorts page to watch progress + download.
+const ASPECT_TO_FORMAT = { '9:16': 'tiktok', '16:9': 'landscape', '1:1': 'square' };
+document.getElementById('btn-export').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-export');
+  if (!API.projectId) { flashToast('No project loaded — try reloading the page', true); return; }
+
+  const ready = (await API.getScenes().catch(() => []))
+    .filter(s => s.image_path && s.status === 'done');
+  if (ready.length === 0) {
+    flashToast('Generate scene images first, then export to video', true);
+    return;
+  }
+
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'STARTING…';
+  try {
+    const job = await API.startEditJob({
+      exportFormat: ASPECT_TO_FORMAT[currentAspect] || 'tiktok',
+      music: 'none',
+    });
+    if (!job || !job.id) throw new Error(job && job.error ? job.error : 'Could not start render');
+    location.href = API.pageUrl('vshorts.html') + '&job=' + encodeURIComponent(job.id);
+  } catch (e) {
+    flashToast('Export failed: ' + (e.message || 'unknown'), true);
+    btn.disabled = false;
+    btn.textContent = original;
+  }
 });
 
 // DOWNLOAD PDF — real PDF (jsPDF) with all generated images + scene info.
