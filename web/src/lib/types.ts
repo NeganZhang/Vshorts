@@ -29,7 +29,10 @@ export type Aspect = '9:16' | '16:9' | '1:1';
 export type ExportFormat = 'tiktok' | 'youtube' | 'landscape' | 'square';
 export type ReferenceMode = 'text' | 'image' | 'both';
 
+export interface TemplateInput { key: string; label: string; type: 'text' | 'textarea' | 'image'; placeholder?: string; required?: boolean }
+
 export interface Template {
+  id?: string;             // present for DB-backed templates (run server-side)
   slug: string;
   title: string;
   category: string;
@@ -37,5 +40,7 @@ export interface Template {
   description: string;
   referenceMode: ReferenceMode;
   defaults: { aspect: Aspect; sceneCount: number; clipSeconds: number; stylePrompt: string };
-  inputs: { key: string; label: string; type: 'text' | 'textarea' | 'image'; placeholder?: string; required?: boolean }[];
+  inputs: TemplateInput[];
+  isOfficial?: boolean;
+  createdBy?: string | null;
 }

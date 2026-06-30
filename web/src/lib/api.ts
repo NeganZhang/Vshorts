@@ -2,7 +2,7 @@
 // but as a small typed module. Auth token comes from the Supabase session, with a
 // localhost dev-token fallback so the SPA is usable before real auth is wired.
 import { supabase, IS_LOCAL } from './supabase';
-import type { Project, Scene, EditJob, Aspect, ExportFormat } from './types';
+import type { Project, Scene, EditJob, Aspect, ExportFormat, Template, ReferenceMode } from './types';
 
 const BASE = import.meta.env.VITE_API_BASE || '';
 const LOCAL_DEV_TOKEN = 'vshort-local-dev-token';
@@ -26,6 +26,20 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const data = text ? JSON.parse(text) : null;
   if (!res.ok) throw new Error((data && (data.error || data.message)) || `HTTP ${res.status}`);
   return data as T;
+}
+
+// Map a DB template row (snake_case, prompt stripped) to the client Template.
+function templateFromApi(r: any): Template {
+  return {
+    id: r.id, slug: r.slug, title: r.title, category: r.category || '', accent: r.accent || '#ff5c2b',
+    description: r.description || '', referenceMode: r.reference_mode || 'text',
+    defaults: {
+      aspect: r.defaults?.aspect || '9:16', sceneCount: r.defaults?.sceneCount ?? 5,
+      clipSeconds: r.defaults?.clipSeconds ?? 5, stylePrompt: r.defaults?.stylePrompt || '',
+    },
+    inputs: Array.isArray(r.input_schema) ? r.input_schema : [],
+    isOfficial: !!r.is_official, createdBy: r.created_by ?? null,
+  };
 }
 
 export const api = {
@@ -66,11 +80,11 @@ export const api = {
     });
   },
   // Upload a reference image (garment/product photo); returns its public URL.
-  async uploadReference(projectId: string, file: File): Promise<{ url: string }> {
+  async uploadReference(file: File): Promise<{ url: string }> {
     const t = await token();
     const fd = new FormData();
     fd.append('file', file);
-    const res = await fetch(`${BASE}/api/projects/${projectId}/reference`, {
+    const res = await fetch(`${BASE}/api/reference`, {
       method: 'POST',
       headers: t ? { Authorization: `Bearer ${t}` } : {},
       body: fd,
@@ -92,6 +106,23 @@ export const api = {
   },
   downloadUrl(projectId: string, jobId: string): string {
     return `${BASE}/api/projects/${projectId}/edit-jobs/${jobId}/download`;
+  },
+
+  // ── Templates ──
+  async listTemplates(): Promise<Template[]> {
+    const rows = await req<any[]>(`/templates`, { headers: await headers(false) });
+    return rows.map(templateFromApi);
+  },
+  async createTemplate(t: {
+    title: string; category?: string; description?: string; accent?: string;
+    reference_mode: ReferenceMode; defaults: Record<string, unknown>;
+    input_schema: unknown[]; prompt_template: string; is_public: boolean;
+  }): Promise<Template> {
+    const row = await req<any>(`/templates`, { method: 'POST', headers: await headers(), body: JSON.stringify(t) });
+    return templateFromApi(row);
+  },
+  async runTemplate(id: string, opts: { inputs: Record<string, string>; referenceImage?: string | null; numScenes?: number; aspect?: Aspect }): Promise<{ projectId: string; scenes: Scene[] }> {
+    return req(`/templates/${id}/run`, { method: 'POST', headers: await headers(), body: JSON.stringify(opts) });
   },
 };
 

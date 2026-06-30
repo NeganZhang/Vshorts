@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { Nav } from '../App';
 import { api, aspectToFormat } from '../lib/api';
 import { buildPrompt } from '../lib/templates';
+import PublishModal from '../components/PublishModal';
 import type { Aspect, EditJob, Scene } from '../lib/types';
 
 const STAGE_LABEL: Record<string, string> = {
@@ -25,6 +26,7 @@ export default function Workflow({ nav }: { nav: Nav }) {
   const [error, setError] = useState('');
   const [refFile, setRefFile] = useState<File | null>(null);   // uploaded garment/product photo
   const [refUrl, setRefUrl] = useState<string | null>(null);   // its public URL (image-to-image)
+  const [showPublish, setShowPublish] = useState(false);
   const pidRef = useRef<string | null>(null);
 
   const canGenerate = useMemo(() => {
@@ -45,14 +47,24 @@ export default function Workflow({ nav }: { nav: Nav }) {
   async function onGenerate() {
     setError(''); setVideoUrl(''); setJob(null); setGenBusy(true);
     try {
-      const prompt = tpl ? buildPrompt(tpl, inputs) : idea.trim();
-      const projectId = await ensurePid();
-      // If a reference photo was provided, upload it first so scene images are
-      // generated image-to-image (garment/product preserved).
+      // Upload the reference photo first (project-independent) so scenes can be
+      // generated image-to-image.
       let ref = refUrl;
-      if (refFile && !ref) { ref = (await api.uploadReference(projectId, refFile)).url; setRefUrl(ref); }
-      await api.autoGenerateScenes(projectId, prompt, sceneCount, aspect, ref);
-      await pollScenes(projectId);
+      if (refFile && !ref) { ref = (await api.uploadReference(refFile)).url; setRefUrl(ref); }
+
+      if (tpl?.id) {
+        // DB-backed template → run server-side; the prompt stays hidden.
+        const r = await api.runTemplate(tpl.id, { inputs, referenceImage: ref, numScenes: sceneCount, aspect });
+        pidRef.current = r.projectId;
+        setScenes(r.scenes);
+        await pollScenes(r.projectId);
+      } else {
+        // Blank workspace (or hardcoded fallback template) → build prompt client-side.
+        const prompt = tpl ? buildPrompt(tpl, inputs) : idea.trim();
+        const projectId = await ensurePid();
+        await api.autoGenerateScenes(projectId, prompt, sceneCount, aspect, ref);
+        await pollScenes(projectId);
+      }
     } catch (e: any) {
       setError(e.message || String(e));
     } finally {
@@ -174,6 +186,9 @@ export default function Workflow({ nav }: { nav: Nav }) {
         <button className="btn-primary w-full mt-4" disabled={!canGenerate || genBusy} onClick={onGenerate}>
           {genBusy ? '生成分镜中…' : '生成分镜 →'}
         </button>
+        {!tpl && idea.trim() && (
+          <button className="btn-ghost w-full mt-2 text-sm" onClick={() => setShowPublish(true)}>发布为模板</button>
+        )}
         {error && <p className="text-sm text-red-400 mt-3">{error}</p>}
       </div>
 
@@ -234,6 +249,15 @@ export default function Workflow({ nav }: { nav: Nav }) {
           </>
         )}
       </div>
+
+      {showPublish && (
+        <PublishModal
+          initialPrompt={idea}
+          defaults={{ aspect, sceneCount, clipSeconds, stylePrompt: '' }}
+          onClose={() => setShowPublish(false)}
+          onPublished={() => { setShowPublish(false); nav.refreshTemplates(); }}
+        />
+      )}
     </section>
   );
 }

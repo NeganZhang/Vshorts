@@ -67,6 +67,9 @@ app.use('/api/projects', authRequired, require('./routes/editJobs'));
 // Templates: gallery is public (prompt stripped); publish + run need auth.
 app.use('/api/templates', require('./routes/templates'));
 
+// Reference-image upload (project-independent), for image-to-image.
+app.use('/api/reference', authRequired, require('./routes/uploads'));
+
 // Conversational agent (drives the pipeline via the API above)
 app.use('/api/agent', authRequired, require('./routes/agent'));
 
