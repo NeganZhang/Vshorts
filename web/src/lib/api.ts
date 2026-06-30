@@ -54,16 +54,30 @@ export const api = {
   async getScenes(projectId: string): Promise<Scene[]> {
     return req(`/projects/${projectId}/scenes`, { headers: await headers(false) });
   },
-  async autoGenerateScenes(projectId: string, prompt: string, numScenes: number, aspect: Aspect): Promise<Scene[]> {
+  async autoGenerateScenes(projectId: string, prompt: string, numScenes: number, aspect: Aspect, referenceImage?: string | null): Promise<Scene[]> {
     return req(`/projects/${projectId}/scenes/auto-generate`, {
       method: 'POST', headers: await headers(),
-      body: JSON.stringify({ prompt, numScenes, aspect }),
+      body: JSON.stringify({ prompt, numScenes, aspect, referenceImage: referenceImage || undefined }),
     });
   },
-  async generateSceneImage(projectId: string, sceneId: string, aspect: Aspect): Promise<{ id: string; status: string }> {
+  async generateSceneImage(projectId: string, sceneId: string, aspect: Aspect, referenceImage?: string | null): Promise<{ id: string; status: string }> {
     return req(`/projects/${projectId}/scenes/${sceneId}/generate`, {
-      method: 'POST', headers: await headers(), body: JSON.stringify({ aspect }),
+      method: 'POST', headers: await headers(), body: JSON.stringify({ aspect, referenceImage: referenceImage || undefined }),
     });
+  },
+  // Upload a reference image (garment/product photo); returns its public URL.
+  async uploadReference(projectId: string, file: File): Promise<{ url: string }> {
+    const t = await token();
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(`${BASE}/api/projects/${projectId}/reference`, {
+      method: 'POST',
+      headers: t ? { Authorization: `Bearer ${t}` } : {},
+      body: fd,
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);
+    return data;
   },
   async updateScene(projectId: string, sceneId: string, patch: Partial<Scene>): Promise<Scene> {
     return req(`/projects/${projectId}/scenes/${sceneId}`, { method: 'PUT', headers: await headers(), body: JSON.stringify(patch) });

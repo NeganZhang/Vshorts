@@ -8,6 +8,22 @@ const { projectOwner } = require('../middleware/ownership');
 const router = Router();
 
 router.use('/:projectId/clips', projectOwner);
+router.use('/:projectId/reference', projectOwner);
+
+// ─── Reference image upload (garment/product photo for image-to-image) ──
+const memUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => (/^image\//.test(file.mimetype) ? cb(null, true) : cb(new Error('Only image files are allowed'))),
+});
+router.post('/:projectId/reference', memUpload.single('file'), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const ext = (path.extname(req.file.originalname || '').toLowerCase().replace(/[^.a-z0-9]/g, '')) || '.png';
+    const url = await data.uploadAsset('scenes', `refs/${req.params.projectId}-${Date.now()}${ext}`, req.file.buffer, req.file.mimetype);
+    res.status(201).json({ url });
+  } catch (e) { next(e); }
+});
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {

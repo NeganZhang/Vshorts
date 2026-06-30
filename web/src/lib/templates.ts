@@ -54,10 +54,11 @@ export function templateBySlug(slug: string): Template | undefined {
 export function buildPrompt(t: Template, inputs: Record<string, string>): string {
   const lines: string[] = [`Make a ${t.defaults.sceneCount}-scene vertical short. Style: ${t.defaults.stylePrompt}.`];
   if (t.slug === 'product') {
-    lines.push(`Product: ${inputs.name || 'the product'}.`);
-    if (inputs.points) lines.push(`Selling points: ${inputs.points.replace(/\n/g, '; ')}.`);
+    lines.push(`Feature the SAME product (the one in the reference photo) in EVERY scene — keep it identical. Product: ${inputs.name || 'the product'}.`);
+    if (inputs.points) lines.push(`Selling points to highlight: ${inputs.points.replace(/\n/g, '; ')}.`);
+    lines.push('Vary the shots across scenes: hero shot, detail close-up, in-use / lifestyle, packaging reveal.');
   } else if (t.slug === 'clothing') {
-    lines.push(`Showcase the garment. Vibe: ${inputs.vibe || 'clean modern lookbook'}.`);
+    lines.push(`A fashion lookbook: a model wears the SAME garment (the one in the reference photo) in EVERY scene — keep the garment identical. Vary the shots: full-body front pose, a slow turn showing the back, a walking street shot, a close-up of fabric and details, a lifestyle pose. Vibe: ${inputs.vibe || 'clean modern editorial'}.`);
   } else {
     lines.push(`Topic: ${inputs.topic || 'a wild idea'}. Vibe: ${inputs.vibe || 'high-energy and funny'}.`);
   }

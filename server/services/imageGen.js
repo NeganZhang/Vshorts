@@ -85,6 +85,9 @@ async function callDoubao(prompt, sceneId, opts = {}) {
         model:           DOUBAO_MODEL,
         prompt,
         size,
+        // Image-to-image: pass a reference photo (e.g. the user's garment/product)
+        // so Seedream preserves it across the generated scenes.
+        ...(opts.referenceImage ? { image: [opts.referenceImage] } : {}),
         sequential_image_generation: 'disabled',  // single image (Seedream 5.0)
         response_format: 'url',                   // pre-signed URL — we re-download
         stream:          false,
@@ -198,7 +201,7 @@ async function generateSceneImage(sceneId, scene, opts = {}) {
   try {
     const prompt = buildImagePrompt(scene || {}, opts.aspect);
     const url    = DOUBAO_API_KEY
-      ? await callDoubao(prompt, sceneId, { size })
+      ? await callDoubao(prompt, sceneId, { size, referenceImage: opts.referenceImage })
       : await callGemini(prompt, sceneId);
     await data.scenes.setImage(sceneId, 'done', url);
   } catch (err) {

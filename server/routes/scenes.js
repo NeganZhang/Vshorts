@@ -68,11 +68,12 @@ router.post('/:projectId/scenes/:sceneId/generate', async (req, res, next) => {
   try {
     const { sceneId, projectId } = req.params;
     const aspect = (req.body && req.body.aspect) || null;
+    const referenceImage = (req.body && req.body.referenceImage) || null;
     const scene = await data.scenes.get(sceneId);
     if (!scene || scene.project_id !== projectId) return res.status(404).json({ error: 'Scene not found' });
 
     await data.scenes.setStatus(sceneId, 'generating');
-    generateSceneImage(sceneId, scene, { aspect });
+    generateSceneImage(sceneId, scene, { aspect, referenceImage });
     res.json({ id: sceneId, status: 'generating' });
   } catch (e) { next(e); }
 });
@@ -81,10 +82,11 @@ router.post('/:projectId/scenes/:sceneId/generate', async (req, res, next) => {
 router.post('/:projectId/scenes/generate-all', async (req, res, next) => {
   try {
     const aspect = (req.body && req.body.aspect) || null;
+    const referenceImage = (req.body && req.body.referenceImage) || null;
     const scenes = await data.scenes.list(req.params.projectId);
     for (let i = 0; i < scenes.length; i++) {
       await data.scenes.setStatus(scenes[i].id, 'generating');
-      setTimeout(() => generateSceneImage(scenes[i].id, scenes[i], { aspect }), i * 500);
+      setTimeout(() => generateSceneImage(scenes[i].id, scenes[i], { aspect, referenceImage }), i * 500);
     }
     res.json({ generating: scenes.length });
   } catch (e) { next(e); }
@@ -100,6 +102,7 @@ router.post('/:projectId/scenes/auto-generate', async (req, res) => {
 
     const numScenes = Math.min(MAX_SCENES, Math.max(2, parseInt(req.body.numScenes) || 4));
     const aspect = req.body.aspect || null;
+    const referenceImage = req.body.referenceImage || null;
 
     // Prefer the LLM semantic split; fall back to a word-chunk split.
     let scenesData = null;
@@ -133,7 +136,7 @@ router.post('/:projectId/scenes/auto-generate', async (req, res) => {
     await data.scenes.insertMany(rows);
 
     const scenes = await data.scenes.list(projectId);
-    scenes.forEach((scene, i) => setTimeout(() => generateSceneImage(scene.id, scene, { aspect }), i * 500));
+    scenes.forEach((scene, i) => setTimeout(() => generateSceneImage(scene.id, scene, { aspect, referenceImage }), i * 500));
 
     res.status(201).json(scenes);
   } catch (err) {

@@ -21,6 +21,8 @@ export default function Workflow({ nav }: { nav: Nav }) {
   const [job, setJob] = useState<EditJob | null>(null);
   const [videoUrl, setVideoUrl] = useState('');
   const [error, setError] = useState('');
+  const [refFile, setRefFile] = useState<File | null>(null);   // uploaded garment/product photo
+  const [refUrl, setRefUrl] = useState<string | null>(null);   // its public URL (image-to-image)
   const pidRef = useRef<string | null>(null);
 
   const canGenerate = useMemo(() => {
@@ -43,7 +45,11 @@ export default function Workflow({ nav }: { nav: Nav }) {
     try {
       const prompt = tpl ? buildPrompt(tpl, inputs) : idea.trim();
       const projectId = await ensurePid();
-      await api.autoGenerateScenes(projectId, prompt, sceneCount, aspect);
+      // If a reference photo was provided, upload it first so scene images are
+      // generated image-to-image (garment/product preserved).
+      let ref = refUrl;
+      if (refFile && !ref) { ref = (await api.uploadReference(projectId, refFile)).url; setRefUrl(ref); }
+      await api.autoGenerateScenes(projectId, prompt, sceneCount, aspect, ref);
       await pollScenes(projectId);
     } catch (e: any) {
       setError(e.message || String(e));
@@ -62,7 +68,7 @@ export default function Workflow({ nav }: { nav: Nav }) {
   async function regenerate(sceneId: string) {
     const pid = pidRef.current; if (!pid) return;
     setScenes((s) => s.map((x) => (x.id === sceneId ? { ...x, status: 'generating' } : x)));
-    await api.generateSceneImage(pid, sceneId, aspect);
+    await api.generateSceneImage(pid, sceneId, aspect, refUrl);
     await pollScenes(pid);
   }
 
@@ -106,7 +112,7 @@ export default function Workflow({ nav }: { nav: Nav }) {
                 <span className="text-xs text-muted">{f.label}{f.required && ' *'}</span>
                 {f.type === 'image' ? (
                   <input type="file" accept="image/*" className="field mt-1 text-sm file:hidden"
-                    onChange={(e) => setInputs((v) => ({ ...v, [f.key]: e.target.files?.[0]?.name || '' }))} />
+                    onChange={(e) => { const file = e.target.files?.[0] || null; setRefFile(file); setRefUrl(null); setInputs((v) => ({ ...v, [f.key]: file?.name || '' })); }} />
                 ) : f.type === 'textarea' ? (
                   <textarea className="field mt-1 min-h-20" placeholder={f.placeholder}
                     value={inputs[f.key] || ''} onChange={(e) => setInputs((v) => ({ ...v, [f.key]: e.target.value }))} />
